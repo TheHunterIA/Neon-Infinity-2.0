@@ -20,6 +20,15 @@ export default function App() {
   const [username, setUsername] = useState(() => localStorage.getItem('neon-dash-username') || '');
   const [tempUsername, setTempUsername] = useState(username);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [activePowerUp, setActivePowerUp] = useState<{ type: string, end: number } | null>(null);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    if (activePowerUp) {
+      const interval = setInterval(() => setTick(t => t + 1), 100);
+      return () => clearInterval(interval);
+    }
+  }, [activePowerUp]);
 
   useEffect(() => {
     if (score > highScore) {
@@ -263,6 +272,7 @@ export default function App() {
         playerPos={playerPos}
         onGameOver={handleGameOver}
         onScoreUpdate={handleScoreUpdate}
+        onPowerUpChange={setActivePowerUp}
       />
 
       {/* HUD */}
@@ -279,6 +289,19 @@ export default function App() {
                 <span className="text-[8px] sm:text-[10px] uppercase tracking-[0.4em] text-white/60 font-mono">Protocol</span>
                 <span className="text-lg sm:text-2xl font-black font-mono text-white tracking-tighter">DASH_INF</span>
               </div>
+
+              {activePowerUp && (
+                <motion.div 
+                  initial={{ y: -20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  className="flex flex-col items-center bg-white/5 border border-white/10 px-4 py-2 rounded-2xl backdrop-blur-md"
+                >
+                  <span className="text-[8px] uppercase tracking-widest text-neon-cyan font-bold">Active Protocol</span>
+                  <span className="text-sm font-black font-mono text-white uppercase tracking-tighter">
+                    {activePowerUp.type} ({Math.max(0, Math.ceil((activePowerUp.end - performance.now()) / 1000))}s)
+                  </span>
+                </motion.div>
+              )}
               
               <div className="flex flex-col items-end gap-4 pointer-events-auto">
                 <button 

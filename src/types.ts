@@ -20,7 +20,7 @@ export interface Obstacle {
   type: 'static' | 'moving' | 'powerup';
   vx?: number;
   hue: number;
-  powerUpType?: 'shield' | 'slowmo' | 'multiplier';
+  powerUpType?: 'shield' | 'slowmo' | 'multiplier' | 'ghost' | 'blast' | 'magnet' | 'shrink' | 'turbo';
   points?: { x: number, y: number }[];
   speed?: number;
   hasNearMissed?: boolean;
