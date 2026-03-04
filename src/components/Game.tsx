@@ -34,13 +34,35 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
   const powerUpActiveRef = useRef<{ type: string, end: number } | null>(null);
   const floatingTextsRef = useRef<{ x: number, y: number, text: string, life: number, color: string }[]>([]);
 
+  const isInitializedRef = useRef(false);
+
   useEffect(() => {
     playerPosRef.current = playerPos;
   }, [playerPos]);
 
   useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const resize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const currentLaneWidth = Math.max(60, Math.min(140, canvas.width / (LANES + 1)));
+      setLaneWidth(currentLaneWidth);
+    };
+
+    window.addEventListener('resize', resize);
+    resize();
+
+    return () => window.removeEventListener('resize', resize);
+  }, []);
+
+  useEffect(() => {
     if (!isStarted || isGameOver || isPaused) {
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
+      if (!isStarted || isGameOver) {
+        isInitializedRef.current = false;
+      }
       return;
     }
 
@@ -49,41 +71,32 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
 
-    let currentLaneWidth = 100;
+    // Reset state ONLY on fresh start
+    if (!isInitializedRef.current) {
+      scoreRef.current = 0;
+      speedRef.current = INITIAL_SPEED;
+      obstaclesRef.current = [];
+      particlesRef.current = [];
+      floatingTextsRef.current = [];
+      comboRef.current = 0;
+      multiplierRef.current = 1;
+      powerUpActiveRef.current = null;
+      lastObstacleTime.current = performance.now();
+      shakeRef.current = 0;
+      offsetRef.current = 0;
 
-    const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      // Ensure lanes are always visible even on very small screens
-      currentLaneWidth = Math.max(60, Math.min(140, canvas.width / (LANES + 1)));
-      setLaneWidth(currentLaneWidth);
-    };
-
-    window.addEventListener('resize', resize);
-    resize();
-
-    // Reset state
-    scoreRef.current = 0;
-    speedRef.current = INITIAL_SPEED;
-    obstaclesRef.current = [];
-    particlesRef.current = [];
-    floatingTextsRef.current = [];
-    comboRef.current = 0;
-    multiplierRef.current = 1;
-    powerUpActiveRef.current = null;
-    lastObstacleTime.current = performance.now();
-    shakeRef.current = 0;
-    offsetRef.current = 0;
-
-    // Initialize Stars
-    const numStars = 150;
-    starsRef.current = Array.from({ length: numStars }, () => ({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      size: Math.random() * 2,
-      speed: Math.random() * 0.5 + 0.1,
-      opacity: Math.random() * 0.5 + 0.3
-    }));
+      // Initialize Stars
+      const numStars = 150;
+      starsRef.current = Array.from({ length: numStars }, () => ({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        size: Math.random() * 2,
+        speed: Math.random() * 0.5 + 0.1,
+        opacity: Math.random() * 0.5 + 0.3
+      }));
+      
+      isInitializedRef.current = true;
+    }
 
     const drawGrid = (ctx: CanvasRenderingContext2D, width: number, height: number, offset: number) => {
       ctx.save();
@@ -98,8 +111,8 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
       
       // Vertical Perspective Lines
       for (let i = -3; i <= 3; i++) {
-        const xTop = width / 2 + i * (currentLaneWidth * 0.4);
-        const xBottom = width / 2 + i * (currentLaneWidth * 5);
+        const xTop = width / 2 + i * (laneWidth * 0.4);
+        const xBottom = width / 2 + i * (laneWidth * 5);
         ctx.beginPath();
         ctx.moveTo(xTop, horizon);
         ctx.lineTo(xBottom, height);
@@ -112,12 +125,12 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
       for (let i = 0; i < numLines; i++) {
         const yPos = horizon + ((i * lineSpacing + offset) % (height - horizon));
         const progress = (yPos - horizon) / (height - horizon);
-        const lineWidth = currentLaneWidth * 10 * progress;
+        const gridLineWidth = laneWidth * 10 * progress;
         
         ctx.globalAlpha = (0.05 + (progress * 0.3)) * (pulse * 2);
         ctx.beginPath();
-        ctx.moveTo(width / 2 - lineWidth / 2, yPos);
-        ctx.lineTo(width / 2 + lineWidth / 2, yPos);
+        ctx.moveTo(width / 2 - gridLineWidth / 2, yPos);
+        ctx.lineTo(width / 2 + gridLineWidth / 2, yPos);
         ctx.stroke();
       }
       ctx.restore();
@@ -127,7 +140,7 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
       ctx.save();
       ctx.translate(x, y);
       
-      const shipScale = currentLaneWidth / 100;
+      const shipScale = laneWidth / 100;
       const shipWidth = 25 * shipScale;
       const shipHeight = 30 * shipScale;
 
@@ -173,8 +186,12 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
       ctx.restore();
     };
 
+    let lastTime = performance.now();
     const update = (time: number) => {
       if (!isStarted || isGameOver) return;
+
+      const dt = Math.min(32, time - lastTime) / 16.67; // Normalize to ~60fps
+      lastTime = time;
 
       // Handle Power-up Expiry
       if (powerUpActiveRef.current && time > powerUpActiveRef.current.end) {
@@ -183,7 +200,7 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
       }
 
       // Speed Adjustment for Slow-mo
-      const effectiveSpeed = powerUpActiveRef.current?.type === 'slowmo' ? speedRef.current * 0.4 : speedRef.current;
+      const effectiveSpeed = (powerUpActiveRef.current?.type === 'slowmo' ? speedRef.current * 0.4 : speedRef.current) * dt;
 
       // Screen Shake
       let shakeX = 0;
@@ -191,7 +208,7 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
       if (shakeRef.current > 0) {
         shakeX = (Math.random() - 0.5) * shakeRef.current;
         shakeY = (Math.random() - 0.5) * shakeRef.current;
-        shakeRef.current *= 0.9;
+        shakeRef.current *= Math.pow(0.9, dt);
       }
 
       // Background - Absolute Black
@@ -224,8 +241,8 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
 
       // Floating Texts
       floatingTextsRef.current = floatingTextsRef.current.filter(ft => {
-        ft.y -= 2;
-        ft.life -= 0.02;
+        ft.y -= 2 * dt;
+        ft.life -= 0.02 * dt;
         ctx.save();
         ctx.globalAlpha = ft.life;
         ctx.fillStyle = ft.color;
@@ -240,11 +257,11 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
 
       // Obstacles & Power-ups
       obstaclesRef.current = obstaclesRef.current.filter(obs => {
-        const obsSpeed = obs.speed || effectiveSpeed;
+        const obsSpeed = (obs.speed || (powerUpActiveRef.current?.type === 'slowmo' ? speedRef.current * 0.4 : speedRef.current)) * dt;
         obs.y += obsSpeed;
         
         if (obs.type === 'moving' && obs.vx) {
-          obs.x += obs.vx;
+          obs.x += obs.vx * dt;
           if (obs.x < 0 || obs.x > canvas.width - obs.width) {
             obs.vx *= -1;
           }
@@ -333,8 +350,9 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
         const dx = playerX - (obs.x + obs.width / 2);
         const dy = playerY - (obs.y + obs.height / 2);
         const dist = Math.sqrt(dx * dx + dy * dy);
+        const collisionDist = 40 * (laneWidth / 100);
         
-        if (dist < 45) {
+        if (dist < collisionDist) {
           if (obs.type === 'powerup') {
             const pType = obs.powerUpType || 'multiplier';
             powerUpActiveRef.current = { type: pType, end: time + 5000 };
@@ -391,7 +409,7 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
         
         if (roll > 0.96) { // Power-up spawn
           const pTypes: ('shield' | 'slowmo' | 'multiplier')[] = ['shield', 'slowmo', 'multiplier'];
-          const pSize = currentLaneWidth * 0.5;
+          const pSize = laneWidth * 0.5;
           obstaclesRef.current.push({
             id: Math.random(), lane, type: 'powerup',
             powerUpType: pTypes[Math.floor(Math.random() * pTypes.length)],
@@ -404,8 +422,8 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
           const isFast = roll < 0.15;
           const isLarge = roll > 0.4 && roll < 0.5;
           
-          const baseSize = currentLaneWidth * (isLarge ? 0.8 : 0.4);
-          const size = baseSize + Math.random() * (currentLaneWidth * 0.3);
+          const baseSize = laneWidth * (isLarge ? 0.8 : 0.4);
+          const size = baseSize + Math.random() * (laneWidth * 0.3);
           const points = [];
           const numPoints = 8 + Math.floor(Math.random() * 5);
           for (let i = 0; i < numPoints; i++) {
@@ -427,7 +445,7 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
 
           // Occasional cluster spawn
           if (roll > 0.9) {
-            const clusterSize = currentLaneWidth * (0.2 + Math.random() * 0.2);
+            const clusterSize = laneWidth * (0.2 + Math.random() * 0.2);
             const clusterPoints = [];
             const clusterNumPoints = 6 + Math.floor(Math.random() * 4);
             for (let i = 0; i < clusterNumPoints; i++) {
@@ -461,7 +479,7 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
       }
 
       particlesRef.current = particlesRef.current.filter(p => {
-        p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+        p.x += p.vx * dt; p.y += p.vy * dt; p.life -= 0.02 * dt;
         ctx.fillStyle = p.color;
         ctx.globalAlpha = p.life;
         ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI * 2); ctx.fill();
@@ -469,7 +487,7 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
         return p.life > 0;
       });
 
-      speedRef.current += SPEED_INCREMENT;
+      speedRef.current += SPEED_INCREMENT * dt;
       frameRef.current = requestAnimationFrame(update);
     };
 
@@ -477,9 +495,8 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
 
     return () => {
       cancelAnimationFrame(frameRef.current);
-      window.removeEventListener('resize', resize);
     };
-  }, [isStarted, isGameOver, isPaused, onGameOver, onScoreUpdate]);
+  }, [isStarted, isGameOver, isPaused, onGameOver, onScoreUpdate, laneWidth]);
 
   return (
     <canvas
