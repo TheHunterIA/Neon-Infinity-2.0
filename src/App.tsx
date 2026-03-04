@@ -175,39 +175,38 @@ export default function App() {
           const maxVel = 0.025;
           let nvx = prev.vx;
           let nvy = prev.vy;
+          let nx = prev.x;
+          let ny = prev.y;
 
-          // Keyboard Input
-          if (keys.has('ArrowLeft') || keys.has('a') || keys.has('A')) nvx -= accel;
-          if (keys.has('ArrowRight') || keys.has('d') || keys.has('D')) nvx += accel;
-          if (keys.has('ArrowUp') || keys.has('w') || keys.has('W')) nvy -= accel;
-          if (keys.has('ArrowDown') || keys.has('s') || keys.has('S')) nvy += accel;
-
-          // Touch Input (Move towards target)
+          // Touch Input (Direct Follow)
           if (touchTarget) {
-            const dx = touchTarget.x - prev.x;
-            const dy = touchTarget.y - prev.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
+            // Direct mapping for touch to make it feel more responsive on mobile
+            // We use a high interpolation factor to keep it smooth but very fast
+            const lerpFactor = 0.4 * dt;
+            nx = prev.x + (touchTarget.x - prev.x) * lerpFactor;
+            ny = prev.y + (touchTarget.y - prev.y) * lerpFactor;
             
-            if (dist > 0.02) {
-              nvx += (dx / dist) * accel * 1.2;
-              nvy += (dy / dist) * accel * 1.2;
-            } else {
-              // Slow down when close to target to prevent jitter
-              nvx *= 0.8;
-              nvy *= 0.8;
-            }
+            // Update velocities based on movement for particle effects
+            nvx = (nx - prev.x);
+            nvy = (ny - prev.y);
+          } else {
+            // Keyboard Input
+            if (keys.has('ArrowLeft') || keys.has('a') || keys.has('A')) nvx -= accel;
+            if (keys.has('ArrowRight') || keys.has('d') || keys.has('D')) nvx += accel;
+            if (keys.has('ArrowUp') || keys.has('w') || keys.has('W')) nvy -= accel;
+            if (keys.has('ArrowDown') || keys.has('s') || keys.has('S')) nvy += accel;
+
+            // Apply Friction
+            nvx *= friction;
+            nvy *= friction;
+
+            // Clamp Velocity
+            nvx = Math.max(-maxVel, Math.min(maxVel, nvx));
+            nvy = Math.max(-maxVel, Math.min(maxVel, nvy));
+            
+            nx = prev.x + nvx;
+            ny = prev.y + nvy;
           }
-
-          // Apply Friction
-          nvx *= friction;
-          nvy *= friction;
-
-          // Clamp Velocity
-          nvx = Math.max(-maxVel, Math.min(maxVel, nvx));
-          nvy = Math.max(-maxVel, Math.min(maxVel, nvy));
-          
-          let nx = prev.x + nvx;
-          let ny = prev.y + nvy;
 
           // Boundary constraints with velocity reset
           if (nx < 0.05) { nx = 0.05; nvx = 0; }

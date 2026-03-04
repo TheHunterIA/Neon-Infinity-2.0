@@ -23,6 +23,7 @@ export interface Obstacle {
   powerUpType?: 'shield' | 'slowmo' | 'multiplier';
   points?: { x: number, y: number }[];
   speed?: number;
+  hasNearMissed?: boolean;
 }
 
 export interface Particle {

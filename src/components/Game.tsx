@@ -346,13 +346,46 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
         }
         ctx.restore();
 
-        // Collision
+        // Collision & Near Miss Logic
         const dx = playerX - (obs.x + obs.width / 2);
         const dy = playerY - (obs.y + obs.height / 2);
         const dist = Math.sqrt(dx * dx + dy * dy);
-        const collisionDist = 40 * (laneWidth / 100);
         
-        if (dist < collisionDist) {
+        const shipScale = laneWidth / 100;
+        const collisionRadius = 38 * shipScale; // More sensitive as requested
+        const nearMissRadius = 65 * shipScale; // Detection zone for near misses
+        
+        // Even more generous collision for power-ups
+        const powerUpRadius = 50 * shipScale;
+        
+        // Near Miss Detection
+        if (obs.type !== 'powerup' && !obs.hasNearMissed && dist < nearMissRadius && dist > collisionRadius) {
+          obs.hasNearMissed = true;
+          scoreRef.current += 50;
+          comboRef.current += 1;
+          
+          floatingTextsRef.current.push({
+            x: playerX, y: playerY - 40,
+            text: 'NEAR MISS!',
+            life: 0.8, color: '#ffffff'
+          });
+
+          // Sparkle effect for near miss
+          for (let i = 0; i < 5; i++) {
+            particlesRef.current.push({
+              x: playerX + (Math.random() - 0.5) * 40,
+              y: playerY + (Math.random() - 0.5) * 40,
+              vx: (Math.random() - 0.5) * 10,
+              vy: (Math.random() - 0.5) * 10,
+              life: 0.5,
+              color: '#ffffff'
+            });
+          }
+        }
+
+        const isColliding = obs.type === 'powerup' ? dist < powerUpRadius : dist < collisionRadius;
+
+        if (isColliding) {
           if (obs.type === 'powerup') {
             const pType = obs.powerUpType || 'multiplier';
             powerUpActiveRef.current = { type: pType, end: time + 5000 };
@@ -365,9 +398,21 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
             });
             return false;
           } else {
+            // Collision Particles
+            for (let i = 0; i < 20; i++) {
+              particlesRef.current.push({
+                x: playerX,
+                y: playerY,
+                vx: (Math.random() - 0.5) * 20,
+                vy: (Math.random() - 0.5) * 20,
+                life: 1,
+                color: '#ff0000'
+              });
+            }
+
             if (powerUpActiveRef.current?.type === 'shield') {
               powerUpActiveRef.current = null;
-              shakeRef.current = 10;
+              shakeRef.current = 15;
               floatingTextsRef.current.push({
                 x: playerX, y: playerY - 50,
                 text: 'SHIELD BROKEN',
@@ -375,7 +420,7 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
               });
               return false;
             }
-            shakeRef.current = 30;
+            shakeRef.current = 40;
             onGameOver(scoreRef.current);
             return false;
           }
