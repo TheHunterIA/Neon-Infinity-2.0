@@ -5,21 +5,27 @@ import { Trophy } from 'lucide-react';
 export const Leaderboard: React.FC = () => {
   const [scores, setScores] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/leaderboard')
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch');
+        return res.json();
+      })
       .then(data => {
         setScores(data);
         setLoading(false);
       })
       .catch(err => {
         console.error('Failed to fetch leaderboard', err);
+        setError('Connection error');
         setLoading(false);
       });
   }, []);
 
   if (loading) return <div className="text-neon-cyan animate-pulse">Loading Leaderboard...</div>;
+  if (error) return <div className="text-neon-magenta font-mono text-sm">{error}</div>;
 
   return (
     <div className="w-full max-w-lg bg-black/80 border border-neon-cyan/30 p-4 sm:p-8 rounded-2xl backdrop-blur-md shadow-[0_0_30px_rgba(0,243,255,0.1)]">

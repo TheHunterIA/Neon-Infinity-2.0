@@ -56,12 +56,19 @@ export default function App() {
     }
 
     if (username && finalScore > 0) {
+      console.log(`Attempting to save score: ${finalScore} for ${username}`);
       try {
         const response = await fetch('/api/scores', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, score: finalScore }),
         });
+        
+        if (!response.ok) {
+          throw new Error(`Server responded with ${response.status}`);
+        }
+        
+        console.log('Score saved successfully');
         
         // Fetch leaderboard to find next competitor
         const lbResponse = await fetch('/api/leaderboard');

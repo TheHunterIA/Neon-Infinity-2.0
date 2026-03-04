@@ -5,7 +5,9 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const db = new Database("leaderboard.db");
+const dbPath = path.join(__dirname, "leaderboard.db");
+console.log(`Initializing database at: ${dbPath}`);
+const db = new Database(dbPath);
 
 // Initialize database
 db.exec(`
@@ -31,11 +33,19 @@ async function startServer() {
 
   app.post("/api/scores", (req, res) => {
     const { username, score } = req.body;
+    console.log(`Received score: ${username} - ${score}`);
     if (!username || typeof score !== "number") {
+      console.error("Invalid data received for score");
       return res.status(400).json({ error: "Invalid data" });
     }
-    db.prepare("INSERT INTO scores (username, score) VALUES (?, ?)").run(username, score);
-    res.json({ success: true });
+    try {
+      db.prepare("INSERT INTO scores (username, score) VALUES (?, ?)").run(username, score);
+      console.log(`Score saved successfully for ${username}`);
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Failed to save score to database:", err);
+      res.status(500).json({ error: "Database error" });
+    }
   });
 
   // Vite middleware for development
