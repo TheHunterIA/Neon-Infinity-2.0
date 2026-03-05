@@ -22,6 +22,8 @@ export default function App() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [activePowerUp, setActivePowerUp] = useState<{ type: string, end: number } | null>(null);
   const [tick, setTick] = useState(0);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [isTiltEnabled, setIsTiltEnabled] = useState(false);
 
   useEffect(() => {
     if (activePowerUp) {
@@ -131,6 +133,42 @@ export default function App() {
     }
   }, [isStarted, isGameOver]);
 
+  const requestTiltPermission = async () => {
+    if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
+      try {
+        const permission = await (DeviceOrientationEvent as any).requestPermission();
+        if (permission === 'granted') {
+          setIsTiltEnabled(true);
+        }
+      } catch (err) {
+        console.error('Permission request failed', err);
+      }
+    } else {
+      // Non-iOS or older browsers
+      setIsTiltEnabled(true);
+    }
+  };
+
+  // Handle Tilt Input
+  useEffect(() => {
+    if (!isTiltEnabled) return;
+
+    const handleOrientation = (e: DeviceOrientationEvent) => {
+      // gamma is left-to-right tilt in degrees [-90, 90]
+      // beta is front-to-back tilt in degrees [-180, 180]
+      const x = (e.gamma || 0) / 30; // Normalize to ~ [-1, 1] for 30deg tilt
+      const y = ((e.beta || 0) - 45) / 30; // Offset by 45deg (natural holding angle) and normalize
+      
+      setTilt({
+        x: Math.max(-1, Math.min(1, x)),
+        y: Math.max(-1, Math.min(1, y))
+      });
+    };
+
+    window.addEventListener('deviceorientation', handleOrientation);
+    return () => window.removeEventListener('deviceorientation', handleOrientation);
+  }, [isTiltEnabled]);
+
   // Handle Input
   useEffect(() => {
     const keys = new Set<string>();
@@ -198,6 +236,7 @@ export default function App() {
           if (isNaN(dt)) return prev;
 
           const accel = 0.0015 * dt;
+          const tiltAccel = 0.0025 * dt;
           const friction = Math.pow(0.9, dt);
           const maxVel = 0.025;
           let nvx = prev.vx;
@@ -211,6 +250,12 @@ export default function App() {
             if (keys.has('ArrowRight') || keys.has('d') || keys.has('D')) nvx += accel;
             if (keys.has('ArrowUp') || keys.has('w') || keys.has('W')) nvy -= accel;
             if (keys.has('ArrowDown') || keys.has('s') || keys.has('S')) nvy += accel;
+
+            // Tilt Input
+            if (isTiltEnabled) {
+              nvx += tilt.x * tiltAccel;
+              nvy += tilt.y * tiltAccel;
+            }
 
             nvx *= friction;
             nvy *= friction;
@@ -253,7 +298,7 @@ export default function App() {
       window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [isStarted, isGameOver, isPaused, togglePause]);
+  }, [isStarted, isGameOver, isPaused, togglePause, isTiltEnabled, tilt]);
 
   return (
     <div className="relative min-h-screen bg-black text-white selection:bg-neon-cyan selection:text-black overflow-hidden">
@@ -361,11 +406,21 @@ export default function App() {
 
               <button 
                 onClick={() => setShowLeaderboard(true)}
-                className="flex items-center justify-center gap-3 bg-transparent border border-white/20 hover:border-neon-magenta text-white font-medium py-3 px-8 rounded-full transition-all"
+                className="flex items-center justify-center gap-3 bg-transparent border border-white/20 hover:border-neon-yellow text-white font-medium py-3 px-8 rounded-full transition-all"
               >
                 <Trophy size={20} className="text-neon-yellow" />
                 <span className="uppercase tracking-widest text-xs">Leaderboard</span>
               </button>
+
+              {!isTiltEnabled && (
+                <button 
+                  onClick={requestTiltPermission}
+                  className="flex items-center justify-center gap-3 bg-white/5 border border-white/10 hover:border-neon-cyan text-white/60 hover:text-white font-medium py-2 px-8 rounded-full transition-all text-[10px]"
+                >
+                  <RotateCcw size={14} className="text-neon-cyan" />
+                  <span className="uppercase tracking-widest">Ativar Giroscópio (Volante)</span>
+                </button>
+              )}
             </div>
 
             <div className="mt-16 flex gap-6 text-white/40">
@@ -485,8 +540,8 @@ export default function App() {
 
       {/* Mobile Controls Hint */}
       {!isStarted && (
-        <div className="fixed bottom-8 left-0 right-0 text-center text-white/20 text-[10px] uppercase tracking-[0.3em] pointer-events-none">
-          Slide anywhere to move • WASD/Arrows for Keyboard
+        <div className="fixed bottom-8 left-0 right-0 text-center text-white/20 text-[10px] uppercase tracking-[0.3em] pointer-events-none px-4">
+          {isTiltEnabled ? 'Incline para dirigir • Arraste para ajuste fino' : 'Deslize para mover • WASD/Setas para Teclado'}
         </div>
       )}
     </div>
