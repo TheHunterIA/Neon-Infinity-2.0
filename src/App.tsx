@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Game } from './components/Game';
 import { Leaderboard } from './components/Leaderboard';
-import { SphereController } from './components/SphereController';
 import { Play, RotateCcw, Trophy, Share2, Github, Zap, Pause } from 'lucide-react';
 
 export default function App() {
@@ -23,7 +22,6 @@ export default function App() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [activePowerUp, setActivePowerUp] = useState<{ type: string, end: number } | null>(null);
   const [tick, setTick] = useState(0);
-  const [controllerVector, setControllerVector] = useState<{ x: number, y: number } | null>(null);
 
   useEffect(() => {
     if (activePowerUp) {
@@ -136,7 +134,7 @@ export default function App() {
   // Handle Input
   useEffect(() => {
     const keys = new Set<string>();
-    let touchTarget: { x: number, y: number } | null = null;
+    let lastTouchPos: { x: number, y: number } | null = null;
     let lastTime = performance.now();
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -153,39 +151,50 @@ export default function App() {
 
     const handleBlur = () => {
       keys.clear();
-      touchTarget = null;
+      lastTouchPos = null;
     };
 
-    const handleTouch = (e: TouchEvent) => {
+    const handleTouchStart = (e: TouchEvent) => {
       if (!isStarted || isGameOver || isPaused) return;
       const touch = e.touches[0];
-      touchTarget = {
-        x: touch.clientX / window.innerWidth,
-        y: touch.clientY / window.innerHeight
-      };
+      lastTouchPos = { x: touch.clientX, y: touch.clientY };
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (!isStarted || isGameOver || isPaused) return;
+      if (!isStarted || isGameOver || isPaused || !lastTouchPos) return;
       const touch = e.touches[0];
-      touchTarget = {
-        x: touch.clientX / window.innerWidth,
-        y: touch.clientY / window.innerHeight
-      };
+      
+      const dx = (touch.clientX - lastTouchPos.x) / window.innerWidth;
+      const dy = (touch.clientY - lastTouchPos.y) / window.innerHeight;
+      
+      setPlayerPos(prev => {
+        let nx = prev.x + dx * 1.5; // Sensitivity multiplier
+        let ny = prev.y + dy * 1.5;
+        
+        // Boundaries
+        nx = Math.max(0.05, Math.min(0.95, nx));
+        ny = Math.max(0.1, Math.min(0.95, ny));
+        
+        return { ...prev, x: nx, y: ny, vx: dx, vy: dy };
+      });
+
+      lastTouchPos = { x: touch.clientX, y: touch.clientY };
+      
+      // Prevent scrolling while playing
+      if (e.cancelable) e.preventDefault();
     };
 
     const handleTouchEnd = () => {
-      touchTarget = null;
+      lastTouchPos = null;
     };
 
     let animationFrameId: number;
     const moveLoop = (time: number) => {
-      const dt = Math.min(32, time - lastTime) / 16.67; // Normalize to ~60fps
+      const dt = Math.min(32, time - lastTime) / 16.67; 
       lastTime = time;
 
       if (isStarted && !isGameOver && !isPaused) {
         setPlayerPos(prev => {
-          // Safety check for NaN
           if (isNaN(dt)) return prev;
 
           const accel = 0.0015 * dt;
@@ -196,30 +205,8 @@ export default function App() {
           let nx = prev.x;
           let ny = prev.y;
 
-          // Sphere Controller Input
-          if (controllerVector) {
-            const sphereAccel = 0.002 * dt;
-            nvx += controllerVector.x * sphereAccel;
-            nvy += controllerVector.y * sphereAccel;
-            
-            nvx *= friction;
-            nvy *= friction;
-            
-            nvx = Math.max(-maxVel, Math.min(maxVel, nvx));
-            nvy = Math.max(-maxVel, Math.min(maxVel, nvy));
-            
-            nx = prev.x + nvx;
-            ny = prev.y + nvy;
-          } 
-          // Touch Input (Direct Follow)
-          else if (touchTarget) {
-            const lerpFactor = 0.4 * dt;
-            nx = prev.x + (touchTarget.x - prev.x) * lerpFactor;
-            ny = prev.y + (touchTarget.y - prev.y) * lerpFactor;
-            nvx = (nx - prev.x);
-            nvy = (ny - prev.y);
-          } else {
-            // Keyboard Input
+          // Keyboard Input (only if not touching)
+          if (!lastTouchPos) {
             if (keys.has('ArrowLeft') || keys.has('a') || keys.has('A')) nvx -= accel;
             if (keys.has('ArrowRight') || keys.has('d') || keys.has('D')) nvx += accel;
             if (keys.has('ArrowUp') || keys.has('w') || keys.has('W')) nvy -= accel;
@@ -235,15 +222,13 @@ export default function App() {
             ny = prev.y + nvy;
           }
 
-          // Boundary constraints with velocity reset
+          // Boundary constraints
           if (nx < 0.05) { nx = 0.05; nvx = 0; }
           if (nx > 0.95) { nx = 0.95; nvx = 0; }
           if (ny < 0.1) { ny = 0.1; nvy = 0; }
           if (ny > 0.95) { ny = 0.95; nvy = 0; }
 
-          // Final safety check
           if (isNaN(nx) || isNaN(ny)) return prev;
-
           return { x: nx, y: ny, vx: nvx, vy: nvy };
         });
       }
@@ -255,10 +240,8 @@ export default function App() {
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('blur', handleBlur);
-    // Remove direct touch listeners to prioritize SphereController if needed, 
-    // or keep them as fallback. Let's keep them but SphereController will take precedence in moveLoop.
-    window.addEventListener('touchstart', handleTouch);
-    window.addEventListener('touchmove', handleTouchMove);
+    window.addEventListener('touchstart', handleTouchStart, { passive: false });
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
     window.addEventListener('touchend', handleTouchEnd);
     
     return () => {
@@ -266,11 +249,11 @@ export default function App() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('blur', handleBlur);
-      window.removeEventListener('touchstart', handleTouch);
+      window.removeEventListener('touchstart', handleTouchStart);
       window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [isStarted, isGameOver, isPaused, togglePause, controllerVector]);
+  }, [isStarted, isGameOver, isPaused, togglePause]);
 
   return (
     <div className="relative min-h-screen bg-black text-white selection:bg-neon-cyan selection:text-black overflow-hidden">
@@ -290,12 +273,6 @@ export default function App() {
 
       {/* HUD */}
       <AnimatePresence>
-        {isStarted && !isGameOver && (
-          <SphereController 
-            onMove={(v) => setControllerVector(v)} 
-            onEnd={() => setControllerVector(null)} 
-          />
-        )}
         {isStarted && !isGameOver && (
           <motion.div 
             initial={{ opacity: 0 }}
@@ -509,7 +486,7 @@ export default function App() {
       {/* Mobile Controls Hint */}
       {!isStarted && (
         <div className="fixed bottom-8 left-0 right-0 text-center text-white/20 text-[10px] uppercase tracking-[0.3em] pointer-events-none">
-          Drag or use WASD/Arrows to Move
+          Slide anywhere to move • WASD/Arrows for Keyboard
         </div>
       )}
     </div>
