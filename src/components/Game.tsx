@@ -32,6 +32,7 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
   // New Addictive Mechanics
   const comboRef = useRef(0);
   const multiplierRef = useRef(1);
+  const lastLevelRef = useRef(0);
   const powerUpActiveRef = useRef<{ type: string, end: number } | null>(null);
   const floatingTextsRef = useRef<{ x: number, y: number, text: string, life: number, color: string }[]>([]);
   const blastWaveRef = useRef<{ x: number, y: number, radius: number, life: number } | null>(null);
@@ -82,6 +83,7 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
       floatingTextsRef.current = [];
       comboRef.current = 0;
       multiplierRef.current = 1;
+      lastLevelRef.current = 0;
       powerUpActiveRef.current = null;
       lastObstacleTime.current = performance.now();
       shakeRef.current = 0;
@@ -138,11 +140,12 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
       ctx.restore();
     };
 
-    const drawShip = (ctx: CanvasRenderingContext2D, x: number, y: number, themeColor: string, time: number) => {
+    const drawShip = (ctx: CanvasRenderingContext2D, x: number, y: number, themeColor: string, time: number, score: number) => {
       ctx.save();
       ctx.translate(x, y);
       
-      let shipScale = laneWidth / 100;
+      const level = Math.min(5, Math.floor(score / 1000));
+      let shipScale = (laneWidth / 100) * (1 + level * 0.05);
       if (powerUpActiveRef.current?.type === 'shrink') shipScale *= 0.5;
       
       const shipWidth = 25 * shipScale;
@@ -151,7 +154,7 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
       // Shield Effect
       if (powerUpActiveRef.current?.type === 'shield') {
         ctx.beginPath();
-        ctx.arc(0, 0, 40 * shipScale, 0, Math.PI * 2);
+        ctx.arc(0, 0, (40 + level * 5) * shipScale, 0, Math.PI * 2);
         ctx.strokeStyle = '#00f3ff';
         ctx.lineWidth = 3;
         ctx.setLineDash([10, 10]);
@@ -161,7 +164,7 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
         
         // Inner glow
         ctx.beginPath();
-        ctx.arc(0, 0, 38 * shipScale, 0, Math.PI * 2);
+        ctx.arc(0, 0, (38 + level * 5) * shipScale, 0, Math.PI * 2);
         ctx.strokeStyle = '#00f3ff';
         ctx.lineWidth = 1;
         ctx.globalAlpha = 0.2;
@@ -174,7 +177,7 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
       // Ghost Effect
       if (powerUpActiveRef.current?.type === 'ghost') {
         ctx.globalAlpha = 0.4 + Math.sin(Date.now() * 0.02) * 0.2;
-        ctx.shadowBlur = 40;
+        ctx.shadowBlur = 40 + level * 10;
         ctx.shadowColor = '#bf00ff';
       }
 
@@ -205,10 +208,10 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
       if (powerUpActiveRef.current?.type === 'turbo') {
         ctx.beginPath();
         ctx.moveTo(-15 * shipScale, 20 * shipScale);
-        ctx.lineTo(0, 40 * shipScale);
+        ctx.lineTo(0, (40 + level * 10) * shipScale);
         ctx.lineTo(15 * shipScale, 20 * shipScale);
         ctx.strokeStyle = '#ff8800';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2 + level;
         ctx.globalAlpha = 0.6 + Math.sin(Date.now() * 0.05) * 0.3;
         ctx.stroke();
       }
@@ -223,30 +226,105 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
         ctx.stroke();
       }
 
-      // Minimalist Player Geometry (Triangle of Light)
-      ctx.shadowBlur = 25;
+      // Dynamic Ship Geometry based on Level
+      ctx.shadowBlur = 25 + level * 10;
       ctx.shadowColor = themeColor;
       ctx.fillStyle = '#000';
       ctx.strokeStyle = themeColor;
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 2 + level * 0.5;
 
       ctx.beginPath();
-      ctx.moveTo(0, -shipHeight); // Tip
-      ctx.lineTo(-shipWidth, shipHeight * 0.66); // Bottom Left
-      ctx.lineTo(shipWidth, shipHeight * 0.66);  // Bottom Right
+      if (level === 0) {
+        // Level 0: Basic Triangle
+        ctx.moveTo(0, -shipHeight);
+        ctx.lineTo(-shipWidth, shipHeight * 0.66);
+        ctx.lineTo(shipWidth, shipHeight * 0.66);
+      } else if (level === 1) {
+        // Level 1: Added side fins
+        ctx.moveTo(0, -shipHeight);
+        ctx.lineTo(-shipWidth * 0.6, 0);
+        ctx.lineTo(-shipWidth, shipHeight * 0.8);
+        ctx.lineTo(0, shipHeight * 0.4);
+        ctx.lineTo(shipWidth, shipHeight * 0.8);
+        ctx.lineTo(shipWidth * 0.6, 0);
+      } else if (level === 2) {
+        // Level 2: Dual Hull / Split Nose
+        ctx.moveTo(-shipWidth * 0.2, -shipHeight);
+        ctx.lineTo(-shipWidth * 0.4, -shipHeight * 0.2);
+        ctx.lineTo(-shipWidth * 1.2, shipHeight * 0.8);
+        ctx.lineTo(0, shipHeight * 0.5);
+        ctx.lineTo(shipWidth * 1.2, shipHeight * 0.8);
+        ctx.lineTo(shipWidth * 0.4, -shipHeight * 0.2);
+        ctx.lineTo(shipWidth * 0.2, -shipHeight);
+      } else if (level === 3) {
+        // Level 3: Advanced Interceptor
+        ctx.moveTo(0, -shipHeight * 1.2);
+        ctx.lineTo(-shipWidth * 0.5, -shipHeight * 0.3);
+        ctx.lineTo(-shipWidth * 1.5, shipHeight * 0.9);
+        ctx.lineTo(-shipWidth * 0.8, shipHeight * 0.4);
+        ctx.lineTo(0, shipHeight * 0.7);
+        ctx.lineTo(shipWidth * 0.8, shipHeight * 0.4);
+        ctx.lineTo(shipWidth * 1.5, shipHeight * 0.9);
+        ctx.lineTo(shipWidth * 0.5, -shipHeight * 0.3);
+      } else if (level === 4) {
+        // Level 4: Elite Vanguard
+        ctx.moveTo(0, -shipHeight * 1.4);
+        ctx.lineTo(-shipWidth * 0.4, -shipHeight * 0.4);
+        ctx.lineTo(-shipWidth * 1.8, shipHeight * 0.2);
+        ctx.lineTo(-shipWidth * 1.2, shipHeight * 0.9);
+        ctx.lineTo(-shipWidth * 0.6, shipHeight * 0.5);
+        ctx.lineTo(0, shipHeight * 0.8);
+        ctx.lineTo(shipWidth * 0.6, shipHeight * 0.5);
+        ctx.lineTo(shipWidth * 1.2, shipHeight * 0.9);
+        ctx.lineTo(shipWidth * 1.8, shipHeight * 0.2);
+        ctx.lineTo(shipWidth * 0.4, -shipHeight * 0.4);
+      } else {
+        // Level 5: Neon God
+        const pulse = Math.sin(time * 0.01) * 5;
+        ctx.moveTo(0, -shipHeight * 1.6 - pulse);
+        ctx.lineTo(-shipWidth * 0.5, -shipHeight * 0.5);
+        ctx.lineTo(-shipWidth * 2.2, shipHeight * 0.1);
+        ctx.lineTo(-shipWidth * 1.4, shipHeight * 1.1);
+        ctx.lineTo(-shipWidth * 0.8, shipHeight * 0.6);
+        ctx.lineTo(0, shipHeight * 1.0);
+        ctx.lineTo(shipWidth * 0.8, shipHeight * 0.6);
+        ctx.lineTo(shipWidth * 1.4, shipHeight * 1.1);
+        ctx.lineTo(shipWidth * 2.2, shipHeight * 0.1);
+        ctx.lineTo(shipWidth * 0.5, -shipHeight * 0.5);
+      }
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
-      // Inner Light Core
-      ctx.shadowBlur = 10;
+      // Inner Light Core (Evolves with level)
+      ctx.shadowBlur = 10 + level * 5;
       ctx.fillStyle = themeColor;
       ctx.beginPath();
-      ctx.moveTo(0, -shipHeight * 0.5);
-      ctx.lineTo(-shipWidth * 0.4, shipHeight * 0.33);
-      ctx.lineTo(shipWidth * 0.4, shipHeight * 0.33);
+      if (level < 3) {
+        ctx.moveTo(0, -shipHeight * 0.5);
+        ctx.lineTo(-shipWidth * 0.4, shipHeight * 0.33);
+        ctx.lineTo(shipWidth * 0.4, shipHeight * 0.33);
+      } else {
+        // Multi-core for high levels
+        ctx.arc(0, 0, 5 * shipScale, 0, Math.PI * 2);
+        ctx.moveTo(-shipWidth * 0.5, shipHeight * 0.2);
+        ctx.arc(-shipWidth * 0.5, shipHeight * 0.2, 3 * shipScale, 0, Math.PI * 2);
+        ctx.moveTo(shipWidth * 0.5, shipHeight * 0.2);
+        ctx.arc(shipWidth * 0.5, shipHeight * 0.2, 3 * shipScale, 0, Math.PI * 2);
+      }
       ctx.closePath();
       ctx.fill();
+
+      // Level 5 Aura
+      if (level === 5) {
+        ctx.save();
+        ctx.globalAlpha = 0.15 + Math.sin(time * 0.005) * 0.05;
+        ctx.beginPath();
+        ctx.arc(0, 0, 60 * shipScale, 0, Math.PI * 2);
+        ctx.fillStyle = themeColor;
+        ctx.fill();
+        ctx.restore();
+      }
 
       ctx.restore();
     };
@@ -307,6 +385,18 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
       const playerX = (playerPosRef.current.x * canvas.width) + shakeX;
       const playerY = (playerPosRef.current.y * canvas.height) + shakeY;
 
+      // Ship Evolution Check
+      const currentLevel = Math.min(5, Math.floor(scoreRef.current / 1000));
+      if (currentLevel > lastLevelRef.current) {
+        lastLevelRef.current = currentLevel;
+        floatingTextsRef.current.push({
+          x: playerX, y: playerY - 80,
+          text: `SHIP EVOLVED: LEVEL ${currentLevel}`,
+          life: 2, color: '#00f3ff'
+        });
+        shakeRef.current = 20;
+      }
+
       let themeColor = '#00f3ff';
       if (powerUpActiveRef.current?.type === 'multiplier') themeColor = '#fff01f';
       if (powerUpActiveRef.current?.type === 'ghost') themeColor = '#bf00ff';
@@ -315,7 +405,7 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
       if (powerUpActiveRef.current?.type === 'shrink') themeColor = '#00ffcc';
       if (powerUpActiveRef.current?.type === 'turbo') themeColor = '#ff8800';
 
-      drawShip(ctx, playerX, playerY, themeColor, time);
+      drawShip(ctx, playerX, playerY, themeColor, time, scoreRef.current);
 
       // Slow-mo Scanlines
       if (powerUpActiveRef.current?.type === 'slowmo') {

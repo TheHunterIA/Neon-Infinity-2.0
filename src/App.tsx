@@ -156,8 +156,8 @@ export default function App() {
     const handleOrientation = (e: DeviceOrientationEvent) => {
       // gamma is left-to-right tilt in degrees [-90, 90]
       // beta is front-to-back tilt in degrees [-180, 180]
-      const x = (e.gamma || 0) / 30; // Normalize to ~ [-1, 1] for 30deg tilt
-      const y = ((e.beta || 0) - 45) / 30; // Offset by 45deg (natural holding angle) and normalize
+      const x = (e.gamma || 0) / 15; // Increased sensitivity (was 30)
+      const y = ((e.beta || 0) - 45) / 15; // Increased sensitivity (was 30)
       
       setTilt({
         x: Math.max(-1, Math.min(1, x)),
@@ -236,7 +236,7 @@ export default function App() {
           if (isNaN(dt)) return prev;
 
           const accel = 0.0015 * dt;
-          const tiltAccel = 0.0025 * dt;
+          const tiltAccel = 0.0045 * dt; // Increased acceleration (was 0.0025)
           const friction = Math.pow(0.9, dt);
           const maxVel = 0.025;
           let nvx = prev.vx;
