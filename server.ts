@@ -1,6 +1,6 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
-import { sql } from "@vercel/postgres";
+import { createClient } from "@supabase/supabase-js";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
@@ -9,31 +9,12 @@ dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Initialize database table
-async function initDb() {
-  try {
-    // Check if we have the POSTGRES_URL before attempting to run SQL
-    if (!process.env.POSTGRES_URL) {
-      console.warn("POSTGRES_URL is not defined. Database features will be unavailable.");
-      return;
-    }
-    await sql`
-      CREATE TABLE IF NOT EXISTS scores (
-        id SERIAL PRIMARY KEY,
-        username TEXT NOT NULL,
-        score INTEGER NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `;
-    console.log("Database table initialized or already exists.");
-  } catch (err) {
-    console.error("Failed to initialize database table:", err);
-  }
-}
+// Initialize Supabase client
+const supabaseUrl = process.env.SUPABASE_URL || "";
+const supabaseKey = process.env.SUPABASE_ANON_KEY || "";
+const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
 async function startServer() {
-  await initDb();
-  
   const app = express();
   const PORT = 3000;
 
@@ -42,16 +23,18 @@ async function startServer() {
   // API Routes
   app.get("/api/leaderboard", async (req, res) => {
     try {
-      if (!process.env.POSTGRES_URL) {
-        return res.status(503).json({ error: "Database not configured" });
+      if (!supabase) {
+        return res.status(503).json({ error: "Supabase not configured" });
       }
-      const { rows } = await sql`
-        SELECT username, score 
-        FROM scores 
-        ORDER BY score DESC 
-        LIMIT 10
-      `;
-      res.json(rows);
+      
+      const { data, error } = await supabase
+        .from("scores")
+        .select("username, score")
+        .order("score", { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      res.json(data || []);
     } catch (err) {
       console.error("Failed to fetch leaderboard:", err);
       res.status(500).json({ error: "Database error" });
@@ -68,13 +51,16 @@ async function startServer() {
     }
 
     try {
-      if (!process.env.POSTGRES_URL) {
-        return res.status(503).json({ error: "Database not configured" });
+      if (!supabase) {
+        return res.status(503).json({ error: "Supabase not configured" });
       }
-      await sql`
-        INSERT INTO scores (username, score) 
-        VALUES (${username}, ${score})
-      `;
+
+      const { error } = await supabase
+        .from("scores")
+        .insert([{ username, score }]);
+
+      if (error) throw error;
+      
       console.log(`Score saved successfully for ${username}`);
       res.json({ success: true });
     } catch (err) {

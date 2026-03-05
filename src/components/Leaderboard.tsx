@@ -20,7 +20,7 @@ export const Leaderboard: React.FC = () => {
       })
       .catch(err => {
         console.error('Failed to fetch leaderboard', err);
-        setError('DATABASE OFFLINE: Please ensure Vercel Postgres environment variables are configured in your dashboard.');
+        setError('DATABASE OFFLINE: Please ensure Supabase environment variables (SUPABASE_URL, SUPABASE_ANON_KEY) are configured in your dashboard.');
         setLoading(false);
       });
   }, []);
@@ -31,7 +31,7 @@ export const Leaderboard: React.FC = () => {
       <div className="text-neon-magenta font-mono text-xs uppercase tracking-widest mb-2">System Alert</div>
       <div className="text-white/60 font-mono text-[10px] leading-relaxed">{error}</div>
       <div className="mt-4 text-[8px] text-white/20 uppercase tracking-tighter">
-        Note: For Vercel deployment, use a hosted DB like Supabase or Vercel Postgres.
+        Note: For Vercel deployment, use Supabase for persistent leaderboard data.
       </div>
     </div>
   );
