@@ -46,24 +46,59 @@ export default function App() {
     // Personality Messages
     const messages = [
       "CRITICAL ERROR", "CONNECTION LOST", "SYSTEM FAILURE", 
-      "PILOT TERMINATED", "DASH INTERRUPTED", "VOID REACHED"
+      "PILOT TERMINATED", "DASH INTERRUPTED", "VOID REACHED",
+      "SIGNAL DEGRADED", "HULL BREACHED", "CORE MELTDOWN",
+      "NAVIGATION OFFLINE", "KINETIC IMPACT"
     ];
     const funMessages = [
       "Nice try, rookie.", "Is that all?", "The void is hungry.",
       "Rebooting systems...", "Try using your eyes next time.",
-      "Almost had it. Almost."
+      "Almost had it. Almost.", "My grandma drives faster than this.",
+      "Was that a dash or a crawl?", "You hit that on purpose, right?",
+      "Maybe stick to Pong?", "Error 404: Skill not found.",
+      "The ship is fine, the pilot... not so much.", "Are you playing with your feet?",
+      "That was painful to watch.", "Did you blink? You missed everything.",
+      "A potato could have dodged that.", "Is your gyroscope broken or just your hands?",
+      "You're making the asteroids look good.", "Don't quit your day job, pilot.",
+      "That's one way to end a career.", "Ouch. That had to hurt.",
+      "Is the screen even on?", "You're a natural... at crashing.",
+      "Asteroid 1 - Pilot 0.", "Try turning the device the other way.",
+      "Was that a speedrun of losing?", "Impressive...ly bad.",
+      "You're the reason we have insurance.", "The asteroids are laughing at you.",
+      "Zero stars. Would not recommend this pilot.", "You call that steering?",
+      "The void expected more. Much more.", "Even the AI is embarrassed for you.",
+      "Minha avó dirige mais rápido que isso.", "Isso foi um dash ou um passeio no parque?",
+      "Você bateu naquele asteroide de propósito, né?", "Talvez seja melhor jogar paciência?",
+      "Erro 404: Habilidade não encontrada.", "A nave está bem, o piloto... nem tanto.",
+      "Você está jogando com os pés?", "Foi doloroso de assistir.",
+      "Você piscou? Porque perdeu tudo.", "Uma batata teria desviado disso.",
+      "Seu giroscópio quebrou ou foram suas mãos?", "Você está fazendo os asteroides parecerem bons.",
+      "Não peça demissão do seu emprego, piloto.", "Essa é uma forma de encerrar a carreira.",
+      "Ai. Essa deve ter doído.", "A tela está ligada?",
+      "Você é um talento natural... para bater.", "Asteroide 1 - Piloto 0.",
+      "Tente virar o aparelho para o outro lado.", "Isso foi um speedrun de como perder?",
+      "Impressionante... de tão ruim.", "Você é o motivo de termos seguro.",
+      "Os asteroides estão rindo de você.", "Zero estrelas. Não recomendo este piloto.",
+      "Você chama isso de pilotar?", "O vazio esperava mais. Muito mais.",
+      "Até a IA está com vergonha de você."
     ];
     const highMessages = [
       "LEGENDARY RUN!", "NEW PROTOCOL ESTABLISHED", "GODLIKE PRECISION",
-      "THE VOID IS IMPRESSED"
+      "THE VOID IS IMPRESSED", "BEYOND THE HORIZON", "UNSTOPPABLE FORCE",
+      "CHAMPION OF THE NEON", "DATA STREAM OPTIMIZED"
     ];
 
     if (finalScore > highScore) {
       setGameOverMessage(highMessages[Math.floor(Math.random() * highMessages.length)]);
-    } else if (finalScore < 100) {
+    } else if (finalScore < 500) {
       setGameOverMessage(funMessages[Math.floor(Math.random() * funMessages.length)]);
     } else {
-      setGameOverMessage(messages[Math.floor(Math.random() * messages.length)]);
+      // 30% chance to still get mocked if you didn't beat high score
+      if (Math.random() < 0.3) {
+        setGameOverMessage(funMessages[Math.floor(Math.random() * funMessages.length)]);
+      } else {
+        setGameOverMessage(messages[Math.floor(Math.random() * messages.length)]);
+      }
     }
 
     if (username && finalScore > 0) {
