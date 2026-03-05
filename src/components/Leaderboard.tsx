@@ -9,8 +9,11 @@ export const Leaderboard: React.FC = () => {
 
   useEffect(() => {
     fetch('/api/leaderboard')
-      .then(res => {
-        if (!res.ok) throw new Error('Leaderboard API Unavailable');
+      .then(async res => {
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Leaderboard API Unavailable');
+        }
         return res.json();
       })
       .then(data => {
@@ -20,7 +23,7 @@ export const Leaderboard: React.FC = () => {
       })
       .catch(err => {
         console.error('Failed to fetch leaderboard', err);
-        setError('DATABASE OFFLINE: Please ensure Supabase environment variables (SUPABASE_URL, SUPABASE_ANON_KEY) are configured in your dashboard.');
+        setError(err.message || 'DATABASE OFFLINE: Please ensure Supabase environment variables are configured.');
         setLoading(false);
       });
   }, []);

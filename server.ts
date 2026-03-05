@@ -24,7 +24,8 @@ async function startServer() {
   app.get("/api/leaderboard", async (req, res) => {
     try {
       if (!supabase) {
-        return res.status(503).json({ error: "Supabase not configured" });
+        console.error("Supabase client not initialized - missing environment variables");
+        return res.status(503).json({ error: "Supabase not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY." });
       }
       
       const { data, error } = await supabase
@@ -33,21 +34,22 @@ async function startServer() {
         .order("score", { ascending: false })
         .limit(10);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase select error:", error);
+        return res.status(500).json({ error: error.message, details: error });
+      }
       res.json(data || []);
-    } catch (err) {
-      console.error("Failed to fetch leaderboard:", err);
-      res.status(500).json({ error: "Database error" });
+    } catch (err: any) {
+      console.error("Internal server error during leaderboard fetch:", err);
+      res.status(500).json({ error: err.message || "Internal server error" });
     }
   });
 
   app.post("/api/scores", async (req, res) => {
     const { username, score } = req.body;
-    console.log(`Received score: ${username} - ${score}`);
     
     if (!username || typeof score !== "number") {
-      console.error("Invalid data received for score");
-      return res.status(400).json({ error: "Invalid data" });
+      return res.status(400).json({ error: "Invalid data: username (string) and score (number) are required" });
     }
 
     try {
@@ -59,13 +61,15 @@ async function startServer() {
         .from("scores")
         .insert([{ username, score }]);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase insert error:", error);
+        return res.status(500).json({ error: error.message, details: error });
+      }
       
-      console.log(`Score saved successfully for ${username}`);
       res.json({ success: true });
-    } catch (err) {
-      console.error("Failed to save score to database:", err);
-      res.status(500).json({ error: "Database error" });
+    } catch (err: any) {
+      console.error("Internal server error during score save:", err);
+      res.status(500).json({ error: err.message || "Internal server error" });
     }
   });
 

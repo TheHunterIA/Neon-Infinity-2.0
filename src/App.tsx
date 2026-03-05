@@ -111,7 +111,8 @@ export default function App() {
         });
         
         if (!response.ok) {
-          throw new Error(`Server responded with ${response.status}`);
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `Server responded with ${response.status}`);
         }
         
         console.log('Score saved successfully');
