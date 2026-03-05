@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Game } from './components/Game';
 import { Leaderboard } from './components/Leaderboard';
+import { SphereController } from './components/SphereController';
 import { Play, RotateCcw, Trophy, Share2, Github, Zap, Pause } from 'lucide-react';
 
 export default function App() {
@@ -22,6 +23,7 @@ export default function App() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [activePowerUp, setActivePowerUp] = useState<{ type: string, end: number } | null>(null);
   const [tick, setTick] = useState(0);
+  const [controllerVector, setControllerVector] = useState<{ x: number, y: number } | null>(null);
 
   useEffect(() => {
     if (activePowerUp) {
@@ -194,15 +196,26 @@ export default function App() {
           let nx = prev.x;
           let ny = prev.y;
 
+          // Sphere Controller Input
+          if (controllerVector) {
+            const sphereAccel = 0.002 * dt;
+            nvx += controllerVector.x * sphereAccel;
+            nvy += controllerVector.y * sphereAccel;
+            
+            nvx *= friction;
+            nvy *= friction;
+            
+            nvx = Math.max(-maxVel, Math.min(maxVel, nvx));
+            nvy = Math.max(-maxVel, Math.min(maxVel, nvy));
+            
+            nx = prev.x + nvx;
+            ny = prev.y + nvy;
+          } 
           // Touch Input (Direct Follow)
-          if (touchTarget) {
-            // Direct mapping for touch to make it feel more responsive on mobile
-            // We use a high interpolation factor to keep it smooth but very fast
+          else if (touchTarget) {
             const lerpFactor = 0.4 * dt;
             nx = prev.x + (touchTarget.x - prev.x) * lerpFactor;
             ny = prev.y + (touchTarget.y - prev.y) * lerpFactor;
-            
-            // Update velocities based on movement for particle effects
             nvx = (nx - prev.x);
             nvy = (ny - prev.y);
           } else {
@@ -212,11 +225,9 @@ export default function App() {
             if (keys.has('ArrowUp') || keys.has('w') || keys.has('W')) nvy -= accel;
             if (keys.has('ArrowDown') || keys.has('s') || keys.has('S')) nvy += accel;
 
-            // Apply Friction
             nvx *= friction;
             nvy *= friction;
 
-            // Clamp Velocity
             nvx = Math.max(-maxVel, Math.min(maxVel, nvx));
             nvy = Math.max(-maxVel, Math.min(maxVel, nvy));
             
@@ -244,6 +255,8 @@ export default function App() {
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('blur', handleBlur);
+    // Remove direct touch listeners to prioritize SphereController if needed, 
+    // or keep them as fallback. Let's keep them but SphereController will take precedence in moveLoop.
     window.addEventListener('touchstart', handleTouch);
     window.addEventListener('touchmove', handleTouchMove);
     window.addEventListener('touchend', handleTouchEnd);
@@ -257,7 +270,7 @@ export default function App() {
       window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [isStarted, isGameOver, isPaused, togglePause]);
+  }, [isStarted, isGameOver, isPaused, togglePause, controllerVector]);
 
   return (
     <div className="relative min-h-screen bg-black text-white selection:bg-neon-cyan selection:text-black overflow-hidden">
@@ -277,6 +290,12 @@ export default function App() {
 
       {/* HUD */}
       <AnimatePresence>
+        {isStarted && !isGameOver && (
+          <SphereController 
+            onMove={(v) => setControllerVector(v)} 
+            onEnd={() => setControllerVector(null)} 
+          />
+        )}
         {isStarted && !isGameOver && (
           <motion.div 
             initial={{ opacity: 0 }}

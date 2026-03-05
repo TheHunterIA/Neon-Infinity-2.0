@@ -7,6 +7,8 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dbPath = path.join(__dirname, "leaderboard.db");
 console.log(`Initializing database at: ${dbPath}`);
+// NOTE: SQLite is not suitable for serverless environments like Vercel.
+// For a production deployment on Vercel, use a hosted database (e.g., Supabase, Vercel Postgres).
 const db = new Database(dbPath);
 
 // Initialize database

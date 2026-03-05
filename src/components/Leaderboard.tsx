@@ -10,22 +10,31 @@ export const Leaderboard: React.FC = () => {
   useEffect(() => {
     fetch('/api/leaderboard')
       .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch');
+        if (!res.ok) throw new Error('Leaderboard API Unavailable');
         return res.json();
       })
       .then(data => {
+        if (!Array.isArray(data)) throw new Error('Invalid data format');
         setScores(data);
         setLoading(false);
       })
       .catch(err => {
         console.error('Failed to fetch leaderboard', err);
-        setError('Connection error');
+        setError('OFFLINE MODE: Leaderboard storage requires a persistent database (SQLite not supported on serverless/Vercel).');
         setLoading(false);
       });
   }, []);
 
-  if (loading) return <div className="text-neon-cyan animate-pulse">Loading Leaderboard...</div>;
-  if (error) return <div className="text-neon-magenta font-mono text-sm">{error}</div>;
+  if (loading) return <div className="text-neon-cyan animate-pulse font-mono text-xs uppercase tracking-widest">Accessing Database...</div>;
+  if (error) return (
+    <div className="w-full max-w-lg bg-black/80 border border-neon-magenta/30 p-6 rounded-2xl backdrop-blur-md">
+      <div className="text-neon-magenta font-mono text-xs uppercase tracking-widest mb-2">System Alert</div>
+      <div className="text-white/60 font-mono text-[10px] leading-relaxed">{error}</div>
+      <div className="mt-4 text-[8px] text-white/20 uppercase tracking-tighter">
+        Note: For Vercel deployment, use a hosted DB like Supabase or Vercel Postgres.
+      </div>
+    </div>
+  );
 
   return (
     <div className="w-full max-w-lg bg-black/80 border border-neon-cyan/30 p-4 sm:p-8 rounded-2xl backdrop-blur-md shadow-[0_0_30px_rgba(0,243,255,0.1)]">
