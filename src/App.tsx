@@ -133,7 +133,12 @@ export default function App() {
     }
   }, [isStarted, isGameOver]);
 
-  const requestTiltPermission = async () => {
+  const toggleTilt = async () => {
+    if (isTiltEnabled) {
+      setIsTiltEnabled(false);
+      return;
+    }
+
     if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
       try {
         const permission = await (DeviceOrientationEvent as any).requestPermission();
@@ -412,15 +417,19 @@ export default function App() {
                 <span className="uppercase tracking-widest text-xs">Leaderboard</span>
               </button>
 
-              {!isTiltEnabled && (
-                <button 
-                  onClick={requestTiltPermission}
-                  className="flex items-center justify-center gap-3 bg-white/5 border border-white/10 hover:border-neon-cyan text-white/60 hover:text-white font-medium py-2 px-8 rounded-full transition-all text-[10px]"
-                >
-                  <RotateCcw size={14} className="text-neon-cyan" />
-                  <span className="uppercase tracking-widest">Ativar Giroscópio (Volante)</span>
-                </button>
-              )}
+              <button 
+                onClick={toggleTilt}
+                className={`flex items-center justify-center gap-3 border py-2 px-8 rounded-full transition-all text-[10px] ${
+                  isTiltEnabled 
+                    ? 'bg-neon-cyan/20 border-neon-cyan text-white shadow-[0_0_10px_rgba(0,243,255,0.3)]' 
+                    : 'bg-white/5 border-white/10 text-white/60 hover:border-neon-cyan hover:text-white'
+                }`}
+              >
+                <RotateCcw size={14} className={isTiltEnabled ? 'text-white' : 'text-neon-cyan'} />
+                <span className="uppercase tracking-widest">
+                  {isTiltEnabled ? 'Giroscópio: ATIVADO' : 'Giroscópio: DESATIVADO'}
+                </span>
+              </button>
             </div>
 
             <div className="mt-16 flex gap-6 text-white/40">

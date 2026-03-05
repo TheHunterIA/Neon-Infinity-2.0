@@ -151,37 +151,19 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
       const shipWidth = 25 * shipScale;
       const shipHeight = 30 * shipScale;
 
-      // Shield Effect
+      // --- Power-up Aura Effects ---
       if (powerUpActiveRef.current?.type === 'shield') {
         ctx.beginPath();
-        ctx.arc(0, 0, (40 + level * 5) * shipScale, 0, Math.PI * 2);
+        ctx.arc(0, 0, (45 + level * 5) * shipScale, 0, Math.PI * 2);
         ctx.strokeStyle = '#00f3ff';
-        ctx.lineWidth = 3;
-        ctx.setLineDash([10, 10]);
-        ctx.lineDashOffset = -time * 0.1;
-        ctx.globalAlpha = 0.6 + Math.sin(Date.now() * 0.01) * 0.2;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 15]);
+        ctx.lineDashOffset = -time * 0.2;
+        ctx.globalAlpha = 0.4 + Math.sin(Date.now() * 0.01) * 0.2;
         ctx.stroke();
-        
-        // Inner glow
-        ctx.beginPath();
-        ctx.arc(0, 0, (38 + level * 5) * shipScale, 0, Math.PI * 2);
-        ctx.strokeStyle = '#00f3ff';
-        ctx.lineWidth = 1;
-        ctx.globalAlpha = 0.2;
-        ctx.stroke();
-        
         ctx.setLineDash([]);
-        ctx.globalAlpha = 1;
       }
 
-      // Ghost Effect
-      if (powerUpActiveRef.current?.type === 'ghost') {
-        ctx.globalAlpha = 0.4 + Math.sin(Date.now() * 0.02) * 0.2;
-        ctx.shadowBlur = 40 + level * 10;
-        ctx.shadowColor = '#bf00ff';
-      }
-
-      // Magnet Effect
       if (powerUpActiveRef.current?.type === 'magnet') {
         ctx.beginPath();
         ctx.arc(0, 0, 60 * shipScale, 0, Math.PI * 2);
@@ -191,136 +173,184 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
         ctx.globalAlpha = 0.3 + Math.sin(Date.now() * 0.01) * 0.2;
         ctx.stroke();
         ctx.setLineDash([]);
-        ctx.globalAlpha = 1;
       }
 
-      // Shrink Effect
-      if (powerUpActiveRef.current?.type === 'shrink') {
-        ctx.beginPath();
-        ctx.arc(0, 0, 25 * shipScale, 0, Math.PI * 2);
-        ctx.strokeStyle = '#00ffcc';
-        ctx.lineWidth = 1;
-        ctx.globalAlpha = 0.4;
-        ctx.stroke();
+      if (powerUpActiveRef.current?.type === 'ghost') {
+        ctx.globalAlpha = 0.4 + Math.sin(Date.now() * 0.02) * 0.2;
       }
 
-      // Turbo Effect
-      if (powerUpActiveRef.current?.type === 'turbo') {
-        ctx.beginPath();
-        ctx.moveTo(-15 * shipScale, 20 * shipScale);
-        ctx.lineTo(0, (40 + level * 10) * shipScale);
-        ctx.lineTo(15 * shipScale, 20 * shipScale);
-        ctx.strokeStyle = '#ff8800';
-        ctx.lineWidth = 2 + level;
-        ctx.globalAlpha = 0.6 + Math.sin(Date.now() * 0.05) * 0.3;
-        ctx.stroke();
-      }
-
-      // Multiplier Effect
-      if (powerUpActiveRef.current?.type === 'multiplier') {
-        ctx.beginPath();
-        ctx.arc(0, 0, 30 * shipScale, 0, Math.PI * 2);
-        ctx.strokeStyle = '#fff01f';
-        ctx.lineWidth = 1;
-        ctx.globalAlpha = 0.5;
-        ctx.stroke();
-      }
-
-      // Dynamic Ship Geometry based on Level
-      ctx.shadowBlur = 25 + level * 10;
+      // --- Ship Design Evolution ---
+      ctx.shadowBlur = 15 + level * 5;
       ctx.shadowColor = themeColor;
-      ctx.fillStyle = '#000';
-      ctx.strokeStyle = themeColor;
-      ctx.lineWidth = 2 + level * 0.5;
+      ctx.lineWidth = 1.5 + level * 0.3;
+      ctx.lineJoin = 'round';
 
-      ctx.beginPath();
+      const drawEngineGlow = (ex: number, ey: number, ew: number, eh: number, color: string) => {
+        ctx.save();
+        const flicker = Math.random() * 0.3 + 0.7;
+        const gradient = ctx.createLinearGradient(ex, ey, ex, ey + eh * 2);
+        gradient.addColorStop(0, color);
+        gradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradient;
+        ctx.globalAlpha = 0.6 * flicker;
+        ctx.fillRect(ex - ew / 2, ey, ew, eh * 2);
+        ctx.restore();
+      };
+
+      const drawCockpit = (cx: number, cy: number, cw: number, ch: number) => {
+        ctx.fillStyle = '#001a1a';
+        ctx.strokeStyle = '#00f3ff';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, cw, ch, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        // Reflection
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.beginPath();
+        ctx.ellipse(cx - cw * 0.3, cy - ch * 0.3, cw * 0.2, ch * 0.2, 0, 0, Math.PI * 2);
+        ctx.fill();
+      };
+
+      ctx.fillStyle = '#050505';
+      ctx.strokeStyle = themeColor;
+
       if (level === 0) {
-        // Level 0: Basic Triangle
+        // Level 0: Sleek Scout
+        ctx.beginPath();
         ctx.moveTo(0, -shipHeight);
-        ctx.lineTo(-shipWidth, shipHeight * 0.66);
-        ctx.lineTo(shipWidth, shipHeight * 0.66);
+        ctx.lineTo(-shipWidth * 0.7, shipHeight * 0.5);
+        ctx.lineTo(-shipWidth * 0.3, shipHeight * 0.5);
+        ctx.lineTo(-shipWidth * 0.3, shipHeight * 0.7);
+        ctx.lineTo(shipWidth * 0.3, shipHeight * 0.7);
+        ctx.lineTo(shipWidth * 0.3, shipHeight * 0.5);
+        ctx.lineTo(shipWidth * 0.7, shipHeight * 0.5);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        drawCockpit(0, -shipHeight * 0.2, shipWidth * 0.2, shipHeight * 0.3);
+        drawEngineGlow(0, shipHeight * 0.7, shipWidth * 0.4, shipHeight * 0.5, themeColor);
       } else if (level === 1) {
-        // Level 1: Added side fins
-        ctx.moveTo(0, -shipHeight);
-        ctx.lineTo(-shipWidth * 0.6, 0);
-        ctx.lineTo(-shipWidth, shipHeight * 0.8);
-        ctx.lineTo(0, shipHeight * 0.4);
-        ctx.lineTo(shipWidth, shipHeight * 0.8);
-        ctx.lineTo(shipWidth * 0.6, 0);
-      } else if (level === 2) {
-        // Level 2: Dual Hull / Split Nose
-        ctx.moveTo(-shipWidth * 0.2, -shipHeight);
+        // Level 1: Winged Fighter
+        ctx.beginPath();
+        ctx.moveTo(0, -shipHeight * 1.1);
         ctx.lineTo(-shipWidth * 0.4, -shipHeight * 0.2);
-        ctx.lineTo(-shipWidth * 1.2, shipHeight * 0.8);
-        ctx.lineTo(0, shipHeight * 0.5);
-        ctx.lineTo(shipWidth * 1.2, shipHeight * 0.8);
+        ctx.lineTo(-shipWidth * 1.2, shipHeight * 0.4);
+        ctx.lineTo(-shipWidth * 0.5, shipHeight * 0.4);
+        ctx.lineTo(-shipWidth * 0.5, shipHeight * 0.8);
+        ctx.lineTo(shipWidth * 0.5, shipHeight * 0.8);
+        ctx.lineTo(shipWidth * 0.5, shipHeight * 0.4);
+        ctx.lineTo(shipWidth * 1.2, shipHeight * 0.4);
         ctx.lineTo(shipWidth * 0.4, -shipHeight * 0.2);
-        ctx.lineTo(shipWidth * 0.2, -shipHeight);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        drawCockpit(0, -shipHeight * 0.3, shipWidth * 0.25, shipHeight * 0.35);
+        drawEngineGlow(-shipWidth * 0.3, shipHeight * 0.8, shipWidth * 0.3, shipHeight * 0.6, themeColor);
+        drawEngineGlow(shipWidth * 0.3, shipHeight * 0.8, shipWidth * 0.3, shipHeight * 0.6, themeColor);
+      } else if (level === 2) {
+        // Level 2: Twin-Hull Interceptor
+        // Left Hull
+        ctx.beginPath();
+        ctx.moveTo(-shipWidth * 0.4, -shipHeight * 1.2);
+        ctx.lineTo(-shipWidth * 0.8, shipHeight * 0.6);
+        ctx.lineTo(-shipWidth * 0.2, shipHeight * 0.6);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        // Right Hull
+        ctx.beginPath();
+        ctx.moveTo(shipWidth * 0.4, -shipHeight * 1.2);
+        ctx.lineTo(shipWidth * 0.8, shipHeight * 0.6);
+        ctx.lineTo(shipWidth * 0.2, shipHeight * 0.6);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        // Bridge
+        ctx.fillRect(-shipWidth * 0.4, -shipHeight * 0.2, shipWidth * 0.8, shipHeight * 0.4);
+        ctx.strokeRect(-shipWidth * 0.4, -shipHeight * 0.2, shipWidth * 0.8, shipHeight * 0.4);
+        drawCockpit(0, -shipHeight * 0.1, shipWidth * 0.3, shipHeight * 0.2);
+        drawEngineGlow(-shipWidth * 0.5, shipHeight * 0.6, shipWidth * 0.4, shipHeight * 0.7, themeColor);
+        drawEngineGlow(shipWidth * 0.5, shipHeight * 0.6, shipWidth * 0.4, shipHeight * 0.7, themeColor);
+        drawEngineGlow(0, shipHeight * 0.2, shipWidth * 0.2, shipHeight * 0.4, themeColor);
       } else if (level === 3) {
-        // Level 3: Advanced Interceptor
-        ctx.moveTo(0, -shipHeight * 1.2);
-        ctx.lineTo(-shipWidth * 0.5, -shipHeight * 0.3);
-        ctx.lineTo(-shipWidth * 1.5, shipHeight * 0.9);
-        ctx.lineTo(-shipWidth * 0.8, shipHeight * 0.4);
-        ctx.lineTo(0, shipHeight * 0.7);
-        ctx.lineTo(shipWidth * 0.8, shipHeight * 0.4);
-        ctx.lineTo(shipWidth * 1.5, shipHeight * 0.9);
-        ctx.lineTo(shipWidth * 0.5, -shipHeight * 0.3);
+        // Level 3: Heavy Destroyer
+        ctx.beginPath();
+        ctx.moveTo(0, -shipHeight * 1.3);
+        ctx.lineTo(-shipWidth * 0.6, -shipHeight * 0.5);
+        ctx.lineTo(-shipWidth * 1.6, shipHeight * 0.2);
+        ctx.lineTo(-shipWidth * 1.6, shipHeight * 0.8);
+        ctx.lineTo(-shipWidth * 0.8, shipHeight * 0.8);
+        ctx.lineTo(-shipWidth * 0.8, shipHeight * 1.0);
+        ctx.lineTo(shipWidth * 0.8, shipHeight * 1.0);
+        ctx.lineTo(shipWidth * 0.8, shipHeight * 0.8);
+        ctx.lineTo(shipWidth * 1.6, shipHeight * 0.8);
+        ctx.lineTo(shipWidth * 1.6, shipHeight * 0.2);
+        ctx.lineTo(shipWidth * 0.6, -shipHeight * 0.5);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        // Tech details
+        ctx.strokeRect(-shipWidth * 0.4, -shipHeight * 0.8, shipWidth * 0.8, shipHeight * 1.2);
+        drawCockpit(0, -shipHeight * 0.6, shipWidth * 0.3, shipHeight * 0.4);
+        drawEngineGlow(-shipWidth * 1.2, shipHeight * 0.8, shipWidth * 0.4, shipHeight * 0.8, themeColor);
+        drawEngineGlow(shipWidth * 1.2, shipHeight * 0.8, shipWidth * 0.4, shipHeight * 0.8, themeColor);
+        drawEngineGlow(-shipWidth * 0.4, shipHeight * 1.0, shipWidth * 0.4, shipHeight * 0.8, themeColor);
+        drawEngineGlow(shipWidth * 0.4, shipHeight * 1.0, shipWidth * 0.4, shipHeight * 0.8, themeColor);
       } else if (level === 4) {
         // Level 4: Elite Vanguard
-        ctx.moveTo(0, -shipHeight * 1.4);
-        ctx.lineTo(-shipWidth * 0.4, -shipHeight * 0.4);
-        ctx.lineTo(-shipWidth * 1.8, shipHeight * 0.2);
-        ctx.lineTo(-shipWidth * 1.2, shipHeight * 0.9);
-        ctx.lineTo(-shipWidth * 0.6, shipHeight * 0.5);
-        ctx.lineTo(0, shipHeight * 0.8);
-        ctx.lineTo(shipWidth * 0.6, shipHeight * 0.5);
-        ctx.lineTo(shipWidth * 1.2, shipHeight * 0.9);
-        ctx.lineTo(shipWidth * 1.8, shipHeight * 0.2);
-        ctx.lineTo(shipWidth * 0.4, -shipHeight * 0.4);
+        ctx.beginPath();
+        ctx.moveTo(0, -shipHeight * 1.5);
+        ctx.lineTo(-shipWidth * 0.5, -shipHeight * 0.7);
+        ctx.lineTo(-shipWidth * 2.0, -shipHeight * 0.2);
+        ctx.lineTo(-shipWidth * 1.5, shipHeight * 0.8);
+        ctx.lineTo(-shipWidth * 0.5, shipHeight * 0.5);
+        ctx.lineTo(-shipWidth * 0.5, shipHeight * 1.2);
+        ctx.lineTo(shipWidth * 0.5, shipHeight * 1.2);
+        ctx.lineTo(shipWidth * 0.5, shipHeight * 0.5);
+        ctx.lineTo(shipWidth * 1.5, shipHeight * 0.8);
+        ctx.lineTo(shipWidth * 2.0, -shipHeight * 0.2);
+        ctx.lineTo(shipWidth * 0.5, -shipHeight * 0.7);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        // Glowing conduits
+        ctx.beginPath();
+        ctx.moveTo(-shipWidth * 0.3, -shipHeight); ctx.lineTo(-shipWidth * 0.3, shipHeight);
+        ctx.moveTo(shipWidth * 0.3, -shipHeight); ctx.lineTo(shipWidth * 0.3, shipHeight);
+        ctx.stroke();
+        drawCockpit(0, -shipHeight * 0.8, shipWidth * 0.35, shipHeight * 0.5);
+        drawEngineGlow(-shipWidth * 1.0, shipHeight * 0.8, shipWidth * 0.5, shipHeight * 1.0, themeColor);
+        drawEngineGlow(shipWidth * 1.0, shipHeight * 0.8, shipWidth * 0.5, shipHeight * 1.0, themeColor);
+        drawEngineGlow(0, shipHeight * 1.2, shipWidth * 0.6, shipHeight * 1.2, themeColor);
       } else {
         // Level 5: Neon God
-        const pulse = Math.sin(time * 0.01) * 5;
-        ctx.moveTo(0, -shipHeight * 1.6 - pulse);
-        ctx.lineTo(-shipWidth * 0.5, -shipHeight * 0.5);
-        ctx.lineTo(-shipWidth * 2.2, shipHeight * 0.1);
-        ctx.lineTo(-shipWidth * 1.4, shipHeight * 1.1);
-        ctx.lineTo(-shipWidth * 0.8, shipHeight * 0.6);
-        ctx.lineTo(0, shipHeight * 1.0);
-        ctx.lineTo(shipWidth * 0.8, shipHeight * 0.6);
-        ctx.lineTo(shipWidth * 1.4, shipHeight * 1.1);
-        ctx.lineTo(shipWidth * 2.2, shipHeight * 0.1);
-        ctx.lineTo(shipWidth * 0.5, -shipHeight * 0.5);
-      }
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      // Inner Light Core (Evolves with level)
-      ctx.shadowBlur = 10 + level * 5;
-      ctx.fillStyle = themeColor;
-      ctx.beginPath();
-      if (level < 3) {
-        ctx.moveTo(0, -shipHeight * 0.5);
-        ctx.lineTo(-shipWidth * 0.4, shipHeight * 0.33);
-        ctx.lineTo(shipWidth * 0.4, shipHeight * 0.33);
-      } else {
-        // Multi-core for high levels
-        ctx.arc(0, 0, 5 * shipScale, 0, Math.PI * 2);
-        ctx.moveTo(-shipWidth * 0.5, shipHeight * 0.2);
-        ctx.arc(-shipWidth * 0.5, shipHeight * 0.2, 3 * shipScale, 0, Math.PI * 2);
-        ctx.moveTo(shipWidth * 0.5, shipHeight * 0.2);
-        ctx.arc(shipWidth * 0.5, shipHeight * 0.2, 3 * shipScale, 0, Math.PI * 2);
-      }
-      ctx.closePath();
-      ctx.fill();
-
-      // Level 5 Aura
-      if (level === 5) {
-        ctx.save();
-        ctx.globalAlpha = 0.15 + Math.sin(time * 0.005) * 0.05;
+        const pulse = Math.sin(time * 0.01) * 10;
+        // Central Core
         ctx.beginPath();
-        ctx.arc(0, 0, 60 * shipScale, 0, Math.PI * 2);
+        ctx.arc(0, 0, shipWidth * 0.8, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+        // Floating Wings
+        const wingOffset = 10 + Math.sin(time * 0.005) * 5;
+        ctx.beginPath();
+        ctx.moveTo(-shipWidth * 0.8 - wingOffset, -shipHeight * 1.5);
+        ctx.lineTo(-shipWidth * 2.5 - wingOffset, shipHeight * 0.5);
+        ctx.lineTo(-shipWidth * 1.2 - wingOffset, shipHeight * 1.2);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(shipWidth * 0.8 + wingOffset, -shipHeight * 1.5);
+        ctx.lineTo(shipWidth * 2.5 + wingOffset, shipHeight * 0.5);
+        ctx.lineTo(shipWidth * 1.2 + wingOffset, shipHeight * 1.2);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        // Energy Core
+        ctx.shadowBlur = 30 + pulse;
+        ctx.fillStyle = themeColor;
+        ctx.beginPath();
+        ctx.arc(0, 0, shipWidth * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+        drawCockpit(0, -shipHeight * 0.4, shipWidth * 0.2, shipHeight * 0.3);
+        drawEngineGlow(0, shipHeight * 0.8, shipWidth * 1.2, shipHeight * 2.0, themeColor);
+        // Aura
+        ctx.save();
+        ctx.globalAlpha = 0.2 + Math.sin(time * 0.005) * 0.1;
+        ctx.beginPath();
+        ctx.arc(0, 0, 80 * shipScale, 0, Math.PI * 2);
         ctx.fillStyle = themeColor;
         ctx.fill();
         ctx.restore();
