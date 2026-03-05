@@ -1,47 +1,80 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
-import Database from "better-sqlite3";
+import { sql } from "@vercel/postgres";
 import path from "path";
 import { fileURLToPath } from "url";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.join(__dirname, "leaderboard.db");
-console.log(`Initializing database at: ${dbPath}`);
-// NOTE: SQLite is not suitable for serverless environments like Vercel.
-// For a production deployment on Vercel, use a hosted database (e.g., Supabase, Vercel Postgres).
-const db = new Database(dbPath);
 
-// Initialize database
-db.exec(`
-  CREATE TABLE IF NOT EXISTS scores (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT NOT NULL,
-    score INTEGER NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
-`);
+// Initialize database table
+async function initDb() {
+  try {
+    // Check if we have the POSTGRES_URL before attempting to run SQL
+    if (!process.env.POSTGRES_URL) {
+      console.warn("POSTGRES_URL is not defined. Database features will be unavailable.");
+      return;
+    }
+    await sql`
+      CREATE TABLE IF NOT EXISTS scores (
+        id SERIAL PRIMARY KEY,
+        username TEXT NOT NULL,
+        score INTEGER NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+    console.log("Database table initialized or already exists.");
+  } catch (err) {
+    console.error("Failed to initialize database table:", err);
+  }
+}
 
 async function startServer() {
+  await initDb();
+  
   const app = express();
   const PORT = 3000;
 
   app.use(express.json());
 
   // API Routes
-  app.get("/api/leaderboard", (req, res) => {
-    const scores = db.prepare("SELECT username, score FROM scores ORDER BY score DESC LIMIT 10").all();
-    res.json(scores);
+  app.get("/api/leaderboard", async (req, res) => {
+    try {
+      if (!process.env.POSTGRES_URL) {
+        return res.status(503).json({ error: "Database not configured" });
+      }
+      const { rows } = await sql`
+        SELECT username, score 
+        FROM scores 
+        ORDER BY score DESC 
+        LIMIT 10
+      `;
+      res.json(rows);
+    } catch (err) {
+      console.error("Failed to fetch leaderboard:", err);
+      res.status(500).json({ error: "Database error" });
+    }
   });
 
-  app.post("/api/scores", (req, res) => {
+  app.post("/api/scores", async (req, res) => {
     const { username, score } = req.body;
     console.log(`Received score: ${username} - ${score}`);
+    
     if (!username || typeof score !== "number") {
       console.error("Invalid data received for score");
       return res.status(400).json({ error: "Invalid data" });
     }
+
     try {
-      db.prepare("INSERT INTO scores (username, score) VALUES (?, ?)").run(username, score);
+      if (!process.env.POSTGRES_URL) {
+        return res.status(503).json({ error: "Database not configured" });
+      }
+      await sql`
+        INSERT INTO scores (username, score) 
+        VALUES (${username}, ${score})
+      `;
       console.log(`Score saved successfully for ${username}`);
       res.json({ success: true });
     } catch (err) {

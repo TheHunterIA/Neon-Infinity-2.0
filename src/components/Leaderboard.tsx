@@ -20,7 +20,7 @@ export const Leaderboard: React.FC = () => {
       })
       .catch(err => {
         console.error('Failed to fetch leaderboard', err);
-        setError('OFFLINE MODE: Leaderboard storage requires a persistent database (SQLite not supported on serverless/Vercel).');
+        setError('DATABASE OFFLINE: Please ensure Vercel Postgres environment variables are configured in your dashboard.');
         setLoading(false);
       });
   }, []);
