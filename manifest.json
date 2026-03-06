@@ -1,23 +1,41 @@
 {
-  "name": "Neon Dash",
-  "short_name": "NeonDash",
-  "description": "A high-speed neon-themed endless runner",
+  "name": "Neon Dash: Protocolo Infinity",
+  "short_name": "Neon Dash",
+  "description": "Desvie de obstáculos em alta velocidade e domine o Protocolo Infinity neste desafio rítmico neon.",
   "start_url": "/",
-  "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#000000",
-  "lang": "en",
+  "display": "fullscreen",
+  "background_color": "#000000",
+  "theme_color": "#00f2ff",
+  "orientation": "portrait",
+  "lang": "pt-BR",
   "scope": "/",
+  "categories": ["games", "arcade"],
+  "id": "com.thehunteria.neondash",
   "icons": [
     {
-      "src": "pwa-192x192.png",
+      "src": "/public/pwa-192x192.png",
       "sizes": "192x192",
-      "type": "image/jpeg"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
-      "src": "pwa-512x512.png",
+      "src": "/public/pwa-512x512.png",
       "sizes": "512x512",
-      "type": "image/jpeg"
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/public/splash-screen.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "splash_screens": [
+    {
+      "src": "/public/splash-screen.png",
+      "sizes": "512x512",
+      "type": "image/png"
     }
   ]
 }
