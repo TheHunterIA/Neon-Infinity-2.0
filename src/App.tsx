@@ -113,17 +113,17 @@ export default function App() {
     }, 2500);
 
     // Score saving logic
-    if (currentUsername && finalScore > 0) {
-      console.log(`[Supabase] Attempting to save score: ${finalScore} for ${currentUsername}`);
+    if (currentUsername && finalScore >= 0) {
+      console.log(`[Leaderboard] Processing score for ${currentUsername}: ${finalScore}`);
       const supabase = getSupabase();
       
       if (!supabase) {
-        console.warn('[Supabase] Not configured, score not saved.');
+        console.warn('[Leaderboard] Supabase not configured. Score not saved to cloud.');
         return;
       }
 
       try {
-        // First, check if user already has a higher score in the DB
+        // 1. Fetch current best score from DB
         const { data: currentEntry, error: fetchError } = await supabase
           .from('leaderboard')
           .select('score')
@@ -131,13 +131,14 @@ export default function App() {
           .maybeSingle();
 
         if (fetchError) {
-          console.error('[Supabase] Fetch error:', fetchError.message);
+          console.error('[Leaderboard] Error fetching existing score:', fetchError.message);
         }
 
         const existingScore = currentEntry?.score || 0;
 
+        // 2. Update if it's a new personal best
         if (finalScore > existingScore) {
-          console.log(`[Supabase] New high score! ${finalScore} > ${existingScore}. Saving...`);
+          console.log(`[Leaderboard] New Personal Best! ${finalScore} > ${existingScore}. Updating database...`);
           const { error: upsertError } = await supabase
             .from('leaderboard')
             .upsert(
@@ -146,33 +147,51 @@ export default function App() {
             );
           
           if (upsertError) {
-            console.error('[Supabase] Upsert error:', upsertError.message);
-            throw upsertError;
+            console.error('[Leaderboard] Update failed:', upsertError.message);
+            // If it fails with "onConflict" issues, it might be missing a unique constraint
+            if (upsertError.message.includes('unique constraint')) {
+              console.warn('[Leaderboard] Tip: Ensure "username" column has a UNIQUE constraint in Supabase.');
+            }
+          } else {
+            console.log('[Leaderboard] Database updated successfully.');
           }
-          console.log('[Supabase] Score updated successfully');
         } else {
-          console.log(`[Supabase] Score ${finalScore} is not higher than existing ${existingScore}. Not updating.`);
+          console.log(`[Leaderboard] Score ${finalScore} did not beat personal best of ${existingScore}.`);
         }
         
-        // Fetch leaderboard to find next competitor (always do this to update current ranking)
+        // 3. Fetch full leaderboard to determine rank and next competitor
         const { data: lbData, error: lbError } = await supabase
           .from('leaderboard')
-          .select('*')
+          .select('username, score')
           .order('score', { ascending: false })
           .limit(100);
 
-        if (lbError) throw lbError;
+        if (lbError) {
+          console.error('[Leaderboard] Failed to fetch ranking data:', lbError.message);
+          return;
+        }
 
         if (lbData) {
-          const myRankIndex = lbData.findIndex((s: any) => s.username === currentUsername && s.score === finalScore);
+          // Find the user's position in the global leaderboard (based on their BEST score)
+          const myBestScore = Math.max(finalScore, existingScore);
+          const myRankIndex = lbData.findIndex((s: any) => s.username === currentUsername);
+          
           if (myRankIndex > 0) {
+            // There is someone above us
             setNextCompetitor(lbData[myRankIndex - 1]);
-          } else {
+            console.log(`[Leaderboard] Current Rank: ${myRankIndex + 1}. Next target: ${lbData[myRankIndex - 1].username} (${lbData[myRankIndex - 1].score})`);
+          } else if (myRankIndex === 0) {
+            // We are #1!
             setNextCompetitor(null);
+            console.log('[Leaderboard] You are currently #1 in the Top 100!');
+          } else {
+            // Not in top 100
+            setNextCompetitor(null);
+            console.log('[Leaderboard] Score not yet in Top 100.');
           }
         }
       } catch (err) {
-        console.error('[Supabase] Failed to save score:', err);
+        console.error('[Leaderboard] Critical failure in update logic:', err);
       }
     }
   }, []); // Empty dependency array thanks to Refs
@@ -555,20 +574,6 @@ export default function App() {
               <div className="text-[10px] text-white/30 uppercase tracking-[0.5em] animate-pulse mb-8">
                 Auto-Rebooting Protocol...
               </div>
-
-              <button 
-                onClick={() => {
-                  isGameOverRef.current = false;
-                  setIsStarted(true);
-                  setIsGameOver(false);
-                  setScore(0);
-                  setNextCompetitor(null);
-                  setPlayerPos({ x: 0.5, y: 0.8, vx: 0, vy: 0 });
-                }}
-                className="bg-white/5 border border-white/20 hover:border-neon-cyan text-white/60 hover:text-white px-6 py-2 rounded-full text-[10px] uppercase tracking-widest transition-all"
-              >
-                Manual Override (Restart)
-              </button>
             </motion.div>
           </motion.div>
         )}

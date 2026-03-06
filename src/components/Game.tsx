@@ -419,9 +419,13 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
       const currentLevel = Math.min(5, Math.floor(scoreRef.current / 1000));
       if (currentLevel > lastLevelRef.current) {
         lastLevelRef.current = currentLevel;
+        const levelBonus = currentLevel * 500;
+        scoreRef.current += levelBonus;
+        onScoreUpdate(scoreRef.current);
+        
         floatingTextsRef.current.push({
           x: playerX, y: playerY - 80,
-          text: `SHIP EVOLVED: LEVEL ${currentLevel}`,
+          text: `EVOLVED! +${levelBonus}`,
           life: 2, color: '#00f3ff'
         });
         shakeRef.current = 20;
@@ -662,8 +666,8 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
               const newPowerUp = { type: pType, end: time + 5000 };
               powerUpActiveRef.current = newPowerUp;
               onPowerUpChange(newPowerUp);
-              if (pType === 'multiplier') multiplierRef.current = 5;
-              if (pType === 'turbo') multiplierRef.current = 10;
+              if (pType === 'multiplier') multiplierRef.current = Math.max(multiplierRef.current, 5);
+              if (pType === 'turbo') multiplierRef.current = Math.max(multiplierRef.current, 10);
             }
             
             floatingTextsRef.current.push({
@@ -718,7 +722,9 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
                 life: 1, color: '#39ff14'
               });
             }
-            const points = 10 * multiplierRef.current;
+            // Combo adds to base points: 10 + 1 for every 5 combo
+            const basePoints = 10 + Math.floor(comboRef.current / 5);
+            const points = basePoints * multiplierRef.current;
             scoreRef.current += points;
             onScoreUpdate(scoreRef.current);
           }
@@ -728,6 +734,17 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
       });
 
       if (blastTriggered) {
+        const destroyedCount = obstaclesRef.current.filter(o => o.type !== 'powerup').length;
+        if (destroyedCount > 0) {
+          const blastBonus = destroyedCount * 100 * multiplierRef.current;
+          scoreRef.current += blastBonus;
+          onScoreUpdate(scoreRef.current);
+          floatingTextsRef.current.push({
+            x: playerX, y: playerY - 100,
+            text: `BLAST BONUS: +${blastBonus}`,
+            life: 1.5, color: '#ff3131'
+          });
+        }
         obstaclesRef.current = obstaclesRef.current.filter(o => o.type === 'powerup');
       }
 

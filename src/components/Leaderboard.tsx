@@ -6,6 +6,7 @@ import { getSupabase } from '../lib/supabase';
 
 export const Leaderboard: React.FC = () => {
   const [scores, setScores] = useState<LeaderboardEntry[]>([]);
+  const [userRank, setUserRank] = useState<{ rank: number, entry: LeaderboardEntry } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
@@ -15,6 +16,7 @@ export const Leaderboard: React.FC = () => {
       setLoading(true);
       setError(null);
       const supabase = getSupabase();
+      const currentUsername = localStorage.getItem('neon-dash-username');
       
       if (!supabase) {
         setError('DATABASE OFFLINE: Supabase environment variables are not configured.');
@@ -23,15 +25,27 @@ export const Leaderboard: React.FC = () => {
       }
 
       try {
+        // Fetch top 100 to find user rank even if not in top 20
         const { data, error: fetchError } = await supabase
           .from('leaderboard')
           .select('*')
           .order('score', { ascending: false })
-          .limit(10);
+          .limit(100);
 
         if (fetchError) throw fetchError;
         
-        setScores(data || []);
+        const allScores = data || [];
+        setScores(allScores.slice(0, 20)); // Show only top 20 in the main list
+
+        if (currentUsername) {
+          const index = allScores.findIndex(s => s.username === currentUsername);
+          if (index !== -1) {
+            setUserRank({ rank: index + 1, entry: allScores[index] });
+          } else {
+            setUserRank(null);
+          }
+        }
+        
         setLoading(false);
       } catch (err: any) {
         console.error('Failed to fetch leaderboard', err);
@@ -41,7 +55,7 @@ export const Leaderboard: React.FC = () => {
     };
 
     fetchLeaderboard();
-  }, [tick]); // Use a tick to allow manual refresh
+  }, [tick]);
 
   if (loading) return (
     <div className="flex flex-col items-center gap-4">
@@ -78,22 +92,34 @@ export const Leaderboard: React.FC = () => {
 
   return (
     <div className="w-full max-w-lg bg-black/80 border border-neon-cyan/30 p-4 sm:p-8 rounded-2xl backdrop-blur-md shadow-[0_0_30px_rgba(0,243,255,0.1)]">
-      <div className="flex items-center gap-3 mb-6">
-        <Trophy className="text-neon-yellow w-6 h-6 sm:w-8 sm:h-8" />
-        <h2 className="text-xl sm:text-2xl font-bold text-neon-cyan uppercase tracking-widest">Top Dashers</h2>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <Trophy className="text-neon-yellow w-6 h-6 sm:w-8 sm:h-8" />
+          <h2 className="text-xl sm:text-2xl font-bold text-neon-cyan uppercase tracking-widest">Top Dashers</h2>
+        </div>
+        <button 
+          onClick={() => setTick(t => t + 1)}
+          className="text-[10px] text-white/40 hover:text-neon-cyan transition-colors uppercase tracking-widest font-mono border border-white/10 px-3 py-1 rounded-full"
+        >
+          Refresh
+        </button>
       </div>
       
-      <div className="space-y-1 sm:space-y-2 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+      <div className="space-y-1 sm:space-y-2 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar mb-6">
         {scores.map((entry, index) => (
           <div 
             key={index}
-            className="flex justify-between items-center py-3 px-2 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors rounded-lg"
+            className={`flex justify-between items-center py-3 px-2 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors rounded-lg ${
+              userRank?.entry.username === entry.username ? 'bg-neon-cyan/10 border-neon-cyan/30' : ''
+            }`}
           >
             <div className="flex items-center gap-3 sm:gap-4">
               <span className={`text-sm sm:text-lg font-mono w-8 ${index < 3 ? 'text-neon-yellow font-bold' : 'text-gray-500'}`}>
                 {index + 1}.
               </span>
-              <span className="font-medium text-sm sm:text-base truncate max-w-[120px] sm:max-w-none">
+              <span className={`font-medium text-sm sm:text-base truncate max-w-[120px] sm:max-w-none ${
+                userRank?.entry.username === entry.username ? 'text-neon-cyan' : ''
+              }`}>
                 {entry.username}
               </span>
             </div>
@@ -104,6 +130,19 @@ export const Leaderboard: React.FC = () => {
           <div className="text-center text-gray-500 py-8 italic">No scores yet. Be the first!</div>
         )}
       </div>
+
+      {userRank && (
+        <div className="mt-4 pt-4 border-t border-white/10">
+          <div className="text-[10px] text-white/40 uppercase tracking-widest mb-2 font-mono">Your Current Standing</div>
+          <div className="flex justify-between items-center py-3 px-4 bg-neon-cyan/5 border border-neon-cyan/20 rounded-xl">
+            <div className="flex items-center gap-4">
+              <span className="text-neon-cyan font-mono font-bold">#{userRank.rank}</span>
+              <span className="font-bold text-white uppercase tracking-tighter">{userRank.entry.username}</span>
+            </div>
+            <span className="text-neon-lime font-mono font-bold">{userRank.entry.score.toLocaleString()}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
