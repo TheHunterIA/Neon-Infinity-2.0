@@ -2,16 +2,20 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Game } from './components/Game';
 import { Leaderboard } from './components/Leaderboard';
+import { AdMob } from '@capacitor-community/admob';
 import { Play, RotateCcw, Trophy, Share2, Github, Zap, Pause, Loader2 } from 'lucide-react';
 import { getSupabase } from './lib/supabase';
 import { initializeAdMob, showRewardedAd, isNative } from './services/adService';
+import { syncPendingScores, saveScoreLocally } from './services/scoreService';
+import { WifiOff } from 'lucide-react';
 
 export default function App() {
   const [isStarted, setIsStarted] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isInvincible, setIsInvincible] = useState(false);
-  const [canRevive, setCanRevive] = useState(true);
+  const [hasRevived, setHasRevived] = useState(false);
+  const [health, setHealth] = useState(100);
   const [isAdLoading, setIsAdLoading] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [score, setScore] = useState(0);
@@ -35,11 +39,19 @@ export default function App() {
   useEffect(() => {
     initializeAdMob();
     
-    const handleOnline = () => setIsOffline(false);
+    const handleOnline = () => {
+      setIsOffline(false);
+      syncPendingScores();
+    };
     const handleOffline = () => setIsOffline(true);
     
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+
+    // Initial sync check
+    if (navigator.onLine) {
+      syncPendingScores();
+    }
     
     return () => {
       window.removeEventListener('online', handleOnline);
@@ -134,12 +146,13 @@ export default function App() {
         setScore(0);
         setNextCompetitor(null);
         setPlayerPos({ x: 0.5, y: 0.8, vx: 0, vy: 0 });
-        setCanRevive(true); // Reset revive for new run
+        setHasRevived(false); // Reset revive for new run
+        setHealth(100);
         setGameId(prev => prev + 1); // Force Game component to reset everything
       }, 2500);
     };
 
-    if (!canRevive) {
+    if (hasRevived) {
       startAutoReboot();
     } else {
       // If can revive, we wait a bit longer or wait for user action
@@ -150,14 +163,21 @@ export default function App() {
     // Score saving logic
     if (currentUsername && finalScore >= 0) {
       console.log(`[Leaderboard] Processing score for ${currentUsername}: ${finalScore}`);
+      
+      // Always save locally first
+      saveScoreLocally(finalScore, currentUsername);
+
       const supabase = getSupabase();
       
-      if (!supabase) {
-        console.warn('[Leaderboard] Supabase not configured. Score not saved to cloud.');
+      if (!supabase || !navigator.onLine) {
+        console.warn('[Leaderboard] Offline or Supabase not configured. Score saved locally for later sync.');
         return;
       }
 
       try {
+        // Sync pending scores immediately if online
+        await syncPendingScores();
+
         // 1. Fetch current best score from DB
         const { data: currentEntry, error: fetchError } = await supabase
           .from('leaderboard')
@@ -252,7 +272,8 @@ export default function App() {
     isGameOverRef.current = false;
     setIsPaused(false);
     setIsInvincible(false);
-    setCanRevive(true);
+    setHasRevived(false);
+    setHealth(100);
     setScore(0);
     setShowLeaderboard(false);
     setPlayerPos({ x: 0.5, y: 0.8, vx: 0, vy: 0 });
@@ -260,7 +281,7 @@ export default function App() {
   };
 
   const handleRevive = async () => {
-    if (!canRevive || isAdLoading) return;
+    if (hasRevived || isAdLoading) return;
     
     if (isOffline && !isNative()) {
       alert('Vídeo indisponível offline');
@@ -273,7 +294,8 @@ export default function App() {
 
     const performRevive = () => {
       setIsAdLoading(false);
-      setCanRevive(false);
+      setHasRevived(true);
+      setHealth(100);
       setIsGameOver(false);
       isGameOverRef.current = false;
       setIsInvincible(true);
@@ -284,14 +306,24 @@ export default function App() {
       }, 3000);
     };
 
-    if (isNative()) {
-      await showRewardedAd(
-        () => performRevive(),
-        () => {
+    // Check for native environment via window.Capacitor or isNative()
+    if ((window as any).Capacitor) {
+      try {
+        await AdMob.prepareRewardVideoAd({
+          adId: 'ca-app-pub-3940256099942544/5224354917',
+        });
+        const reward = await AdMob.showRewardVideoAd();
+        if (reward) {
+          performRevive();
+        } else {
           setIsAdLoading(false);
           alert('Falha ao carregar vídeo. Tente novamente.');
         }
-      );
+      } catch (e) {
+        console.error('AdMob Error:', e);
+        setIsAdLoading(false);
+        alert('Falha ao carregar vídeo. Tente novamente.');
+      }
     } else {
       // Web Simulation: 3s delay
       setTimeout(() => {
@@ -449,6 +481,23 @@ export default function App() {
         onPowerUpChange={setActivePowerUp}
       />
 
+      {/* Offline Indicator */}
+      <AnimatePresence>
+        {isOffline && (
+          <motion.div
+            initial={{ y: -50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -50, opacity: 0 }}
+            className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 bg-neon-magenta/20 border border-neon-magenta/40 px-4 py-2 rounded-full backdrop-blur-md"
+          >
+            <WifiOff size={14} className="text-neon-magenta animate-pulse" />
+            <span className="text-[10px] font-mono text-white uppercase tracking-widest">
+              Modo Offline: Pontuação será sincronizada ao conectar
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* HUD */}
       <AnimatePresence>
         {isStarted && !isGameOver && (
@@ -580,7 +629,7 @@ export default function App() {
               <div className="text-4xl sm:text-5xl font-mono text-neon-cyan mb-6 neon-glow">{lastFinalScore}</div>
               
               <div className="flex flex-col items-center gap-4 mb-8">
-                {canRevive && (
+                {!hasRevived && (
                   <button
                     onClick={handleRevive}
                     disabled={isOffline && !isNative()}
@@ -592,7 +641,7 @@ export default function App() {
                   >
                     <Play fill="currentColor" size={18} className="text-neon-magenta" />
                     <span className="uppercase tracking-widest font-bold text-sm">
-                      {isOffline && !isNative() ? 'Vídeo indisponível offline' : 'Reviver (1x)'}
+                      {isOffline && !isNative() ? 'Vídeo indisponível offline' : 'REVIVER (VÍDEO)'}
                     </span>
                     {!isOffline && <div className="absolute -inset-1 bg-neon-magenta opacity-20 blur-md group-hover:opacity-40 transition-opacity" />}
                   </button>

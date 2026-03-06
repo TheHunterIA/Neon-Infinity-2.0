@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { LeaderboardEntry } from '../types';
-import { Trophy } from 'lucide-react';
+import { Trophy, WifiOff } from 'lucide-react';
 import { getSupabase } from '../lib/supabase';
+import { cacheLeaderboard, getCachedLeaderboard } from '../services/scoreService';
 
 export const Leaderboard: React.FC = () => {
   const [scores, setScores] = useState<LeaderboardEntry[]>([]);
@@ -10,6 +11,18 @@ export const Leaderboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
@@ -18,8 +31,25 @@ export const Leaderboard: React.FC = () => {
       const supabase = getSupabase();
       const currentUsername = localStorage.getItem('neon-dash-username');
       
-      if (!supabase) {
-        setError('DATABASE OFFLINE: Supabase environment variables are not configured.');
+      if (!supabase || isOffline) {
+        const cachedData = getCachedLeaderboard();
+        if (cachedData.length > 0) {
+          setScores(cachedData.slice(0, 20));
+          if (currentUsername) {
+            const index = cachedData.findIndex(s => s.username === currentUsername);
+            if (index !== -1) {
+              setUserRank({ rank: index + 1, entry: cachedData[index] as any });
+            }
+          }
+          setLoading(false);
+          return;
+        }
+        
+        if (isOffline) {
+          setError('OFFLINE: Sem conexão com o servidor. Leaderboard indisponível.');
+        } else {
+          setError('DATABASE OFFLINE: Supabase environment variables are not configured.');
+        }
         setLoading(false);
         return;
       }
@@ -36,6 +66,7 @@ export const Leaderboard: React.FC = () => {
         
         const allScores = data || [];
         setScores(allScores.slice(0, 20)); // Show only top 20 in the main list
+        cacheLeaderboard(allScores); // Cache for offline use
 
         if (currentUsername) {
           const index = allScores.findIndex(s => s.username === currentUsername);
@@ -49,13 +80,22 @@ export const Leaderboard: React.FC = () => {
         setLoading(false);
       } catch (err: any) {
         console.error('Failed to fetch leaderboard', err);
+        
+        // Fallback to cache on error
+        const cachedData = getCachedLeaderboard();
+        if (cachedData.length > 0) {
+          setScores(cachedData.slice(0, 20));
+          setLoading(false);
+          return;
+        }
+
         setError(err.message || 'Failed to connect to leaderboard database.');
         setLoading(false);
       }
     };
 
     fetchLeaderboard();
-  }, [tick]);
+  }, [tick, isOffline]);
 
   if (loading) return (
     <div className="flex flex-col items-center gap-4">
@@ -96,6 +136,7 @@ export const Leaderboard: React.FC = () => {
         <div className="flex items-center gap-3">
           <Trophy className="text-neon-yellow w-6 h-6 sm:w-8 sm:h-8" />
           <h2 className="text-xl sm:text-2xl font-bold text-neon-cyan uppercase tracking-widest">Top Dashers</h2>
+          {isOffline && <WifiOff size={16} className="text-neon-magenta animate-pulse" />}
         </div>
         <button 
           onClick={() => setTick(t => t + 1)}
