@@ -18,6 +18,7 @@ export default function App() {
   const [health, setHealth] = useState(100);
   const [isAdLoading, setIsAdLoading] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [showOfflineBanner, setShowOfflineBanner] = useState(false);
   const [score, setScore] = useState(0);
   const [lastFinalScore, setLastFinalScore] = useState(0);
   const [gameOverMessage, setGameOverMessage] = useState('');
@@ -36,11 +37,22 @@ export default function App() {
 
   const autoRebootTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const triggerOfflineBanner = () => {
+    if (!navigator.onLine) {
+      setShowOfflineBanner(true);
+      setTimeout(() => setShowOfflineBanner(false), 6000);
+    }
+  };
+
   useEffect(() => {
     initializeAdMob();
     
+    // Show offline message at initial reboot
+    triggerOfflineBanner();
+    
     const handleOnline = () => {
       setIsOffline(false);
+      setShowOfflineBanner(false);
       syncPendingScores();
     };
     const handleOffline = () => setIsOffline(true);
@@ -149,6 +161,7 @@ export default function App() {
         setHasRevived(false); // Reset revive for new run
         setHealth(100);
         setGameId(prev => prev + 1); // Force Game component to reset everything
+        triggerOfflineBanner(); // Show banner on auto-reboot if offline
       }, 2500);
     };
 
@@ -278,6 +291,7 @@ export default function App() {
     setShowLeaderboard(false);
     setPlayerPos({ x: 0.5, y: 0.8, vx: 0, vy: 0 });
     setGameId(prev => prev + 1);
+    triggerOfflineBanner(); // Show banner on manual start if offline
   };
 
   const handleRevive = async () => {
@@ -483,7 +497,7 @@ export default function App() {
 
       {/* Offline Indicator */}
       <AnimatePresence>
-        {isOffline && (
+        {showOfflineBanner && (
           <motion.div
             initial={{ y: -50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
