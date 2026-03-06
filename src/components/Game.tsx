@@ -5,6 +5,7 @@ interface GameProps {
   isStarted: boolean;
   isGameOver: boolean;
   isPaused: boolean;
+  isInvincible: boolean;
   playerPos: { x: number, y: number, vx: number, vy: number };
   onGameOver: (score: number) => void;
   onScoreUpdate: (score: number) => void;
@@ -15,7 +16,7 @@ const LANES = 3;
 const INITIAL_SPEED = 7;
 const SPEED_INCREMENT = 0.002;
 
-export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, playerPos, onGameOver, onScoreUpdate, onPowerUpChange }) => {
+export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isInvincible, playerPos, onGameOver, onScoreUpdate, onPowerUpChange }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const playerPosRef = useRef(playerPos);
   const [laneWidth, setLaneWidth] = useState(100);
@@ -63,7 +64,9 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
   useEffect(() => {
     if (!isStarted || isGameOver || isPaused) {
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
-      if (!isStarted || isGameOver) {
+      // Only reset initialization if the game is stopped (not just Game Over, which might be revived)
+      // We'll reset it in App.tsx when a fresh game starts
+      if (!isStarted) {
         isInitializedRef.current = false;
       }
       return;
@@ -175,7 +178,7 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
         ctx.setLineDash([]);
       }
 
-      if (powerUpActiveRef.current?.type === 'ghost') {
+      if (powerUpActiveRef.current?.type === 'ghost' || isInvincible) {
         ctx.globalAlpha = 0.4 + Math.sin(Date.now() * 0.02) * 0.2;
       }
 
@@ -677,8 +680,8 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
             });
             return false;
           } else {
-            // Ghost power-up bypasses obstacles
-            if (powerUpActiveRef.current?.type === 'ghost') {
+            // Ghost power-up or Invincibility bypasses obstacles
+            if (powerUpActiveRef.current?.type === 'ghost' || isInvincible) {
               return true;
             }
 
@@ -847,7 +850,7 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, pla
     return () => {
       cancelAnimationFrame(frameRef.current);
     };
-  }, [isStarted, isGameOver, isPaused, onGameOver, onScoreUpdate, laneWidth]);
+  }, [isStarted, isGameOver, isPaused, isInvincible, onGameOver, onScoreUpdate, laneWidth]);
 
   return (
     <canvas

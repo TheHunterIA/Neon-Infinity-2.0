@@ -12,6 +12,8 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@capacitor-community/admob": "^8.0.0",
+    "@capacitor/core": "^8.2.0",
     "@google/genai": "^1.29.0",
     "@supabase/supabase-js": "^2.98.0",
     "@tailwindcss/vite": "^4.1.14",

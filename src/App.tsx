@@ -2,13 +2,18 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Game } from './components/Game';
 import { Leaderboard } from './components/Leaderboard';
-import { Play, RotateCcw, Trophy, Share2, Github, Zap, Pause } from 'lucide-react';
+import { Play, RotateCcw, Trophy, Share2, Github, Zap, Pause, Loader2 } from 'lucide-react';
 import { getSupabase } from './lib/supabase';
+import { initializeAdMob, showRewardedAd, isNative } from './services/adService';
 
 export default function App() {
   const [isStarted, setIsStarted] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [isInvincible, setIsInvincible] = useState(false);
+  const [canRevive, setCanRevive] = useState(true);
+  const [isAdLoading, setIsAdLoading] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [score, setScore] = useState(0);
   const [lastFinalScore, setLastFinalScore] = useState(0);
   const [gameOverMessage, setGameOverMessage] = useState('');
@@ -23,6 +28,24 @@ export default function App() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [activePowerUp, setActivePowerUp] = useState<{ type: string, end: number } | null>(null);
   const [tick, setTick] = useState(0);
+  const [gameId, setGameId] = useState(0);
+
+  const autoRebootTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    initializeAdMob();
+    
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Stable refs for values used in callbacks to prevent game loop restarts
   const usernameRef = useRef(username);
@@ -100,15 +123,29 @@ export default function App() {
       }
     }
 
-    // Instant-ish restart after 2.5 seconds
-    setTimeout(() => {
-      isGameOverRef.current = false;
-      setIsStarted(true);
-      setIsGameOver(false);
-      setScore(0);
-      setNextCompetitor(null);
-      setPlayerPos({ x: 0.5, y: 0.8, vx: 0, vy: 0 });
-    }, 2500);
+    // Auto-reboot logic
+    if (autoRebootTimeoutRef.current) clearTimeout(autoRebootTimeoutRef.current);
+
+    const startAutoReboot = () => {
+      autoRebootTimeoutRef.current = setTimeout(() => {
+        isGameOverRef.current = false;
+        setIsStarted(true);
+        setIsGameOver(false);
+        setScore(0);
+        setNextCompetitor(null);
+        setPlayerPos({ x: 0.5, y: 0.8, vx: 0, vy: 0 });
+        setCanRevive(true); // Reset revive for new run
+        setGameId(prev => prev + 1); // Force Game component to reset everything
+      }, 2500);
+    };
+
+    if (!canRevive) {
+      startAutoReboot();
+    } else {
+      // If can revive, we wait a bit longer or wait for user action
+      // For now, let's give 5 seconds to decide before auto-rebooting
+      autoRebootTimeoutRef.current = setTimeout(startAutoReboot, 5000);
+    }
 
     // Score saving logic
     if (currentUsername && finalScore >= 0) {
@@ -208,13 +245,59 @@ export default function App() {
     setUsername(finalName);
     localStorage.setItem('neon-dash-username', finalName);
     
+    if (autoRebootTimeoutRef.current) clearTimeout(autoRebootTimeoutRef.current);
+
     setIsStarted(true);
     setIsGameOver(false);
     isGameOverRef.current = false;
     setIsPaused(false);
+    setIsInvincible(false);
+    setCanRevive(true);
     setScore(0);
     setShowLeaderboard(false);
     setPlayerPos({ x: 0.5, y: 0.8, vx: 0, vy: 0 });
+    setGameId(prev => prev + 1);
+  };
+
+  const handleRevive = async () => {
+    if (!canRevive || isAdLoading) return;
+    
+    if (isOffline && !isNative()) {
+      alert('Vídeo indisponível offline');
+      return;
+    }
+
+    if (autoRebootTimeoutRef.current) clearTimeout(autoRebootTimeoutRef.current);
+    
+    setIsAdLoading(true);
+
+    const performRevive = () => {
+      setIsAdLoading(false);
+      setCanRevive(false);
+      setIsGameOver(false);
+      isGameOverRef.current = false;
+      setIsInvincible(true);
+      
+      // 3 seconds of invincibility
+      setTimeout(() => {
+        setIsInvincible(false);
+      }, 3000);
+    };
+
+    if (isNative()) {
+      await showRewardedAd(
+        () => performRevive(),
+        () => {
+          setIsAdLoading(false);
+          alert('Falha ao carregar vídeo. Tente novamente.');
+        }
+      );
+    } else {
+      // Web Simulation: 3s delay
+      setTimeout(() => {
+        performRevive();
+      }, 3000);
+    }
   };
 
   const togglePause = React.useCallback(() => {
@@ -355,9 +438,11 @@ export default function App() {
            style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, #00f3ff 1px, transparent 0)', backgroundSize: '40px 40px' }} />
 
       <Game 
+        key={gameId}
         isStarted={isStarted} 
         isGameOver={isGameOver} 
         isPaused={isPaused}
+        isInvincible={isInvincible}
         playerPos={playerPos}
         onGameOver={handleGameOver}
         onScoreUpdate={handleScoreUpdate}
@@ -494,6 +579,30 @@ export default function App() {
               </h2>
               <div className="text-4xl sm:text-5xl font-mono text-neon-cyan mb-6 neon-glow">{lastFinalScore}</div>
               
+              <div className="flex flex-col items-center gap-4 mb-8">
+                {canRevive && (
+                  <button
+                    onClick={handleRevive}
+                    disabled={isOffline && !isNative()}
+                    className={`group relative flex items-center justify-center gap-3 py-3 px-8 rounded-full border-2 transition-all transform hover:scale-105 active:scale-95 ${
+                      isOffline && !isNative()
+                        ? 'border-white/10 text-white/20 cursor-not-allowed'
+                        : 'border-neon-magenta text-white hover:bg-neon-magenta/20 shadow-[0_0_15px_rgba(255,0,255,0.3)]'
+                    }`}
+                  >
+                    <Play fill="currentColor" size={18} className="text-neon-magenta" />
+                    <span className="uppercase tracking-widest font-bold text-sm">
+                      {isOffline && !isNative() ? 'Vídeo indisponível offline' : 'Reviver (1x)'}
+                    </span>
+                    {!isOffline && <div className="absolute -inset-1 bg-neon-magenta opacity-20 blur-md group-hover:opacity-40 transition-opacity" />}
+                  </button>
+                )}
+
+                <div className="text-[10px] text-white/30 uppercase tracking-[0.5em] animate-pulse">
+                  Auto-Rebooting Protocol...
+                </div>
+              </div>
+
               {nextCompetitor && (
                 <motion.div 
                   initial={{ y: 20, opacity: 0 }}
@@ -507,11 +616,30 @@ export default function App() {
                   <span className="text-neon-yellow font-mono text-xs sm:text-base">{nextCompetitor.score}</span>
                 </motion.div>
               )}
-
-              <div className="text-[10px] text-white/30 uppercase tracking-[0.5em] animate-pulse mb-8">
-                Auto-Rebooting Protocol...
-              </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Ad Loading Modal */}
+      <AnimatePresence>
+        {isAdLoading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 flex flex-col items-center justify-center z-[100] bg-black/95 backdrop-blur-md"
+          >
+            <div className="relative">
+              <Loader2 size={64} className="text-neon-cyan animate-spin mb-6" />
+              <div className="absolute inset-0 bg-neon-cyan/20 blur-xl animate-pulse" />
+            </div>
+            <h3 className="text-2xl font-black text-white uppercase tracking-[0.2em] italic mb-2">
+              Carregando Vídeo...
+            </h3>
+            <p className="text-neon-cyan/60 font-mono text-[10px] uppercase tracking-widest">
+              Sincronizando com a rede neural
+            </p>
           </motion.div>
         )}
       </AnimatePresence>
