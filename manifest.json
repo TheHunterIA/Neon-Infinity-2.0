@@ -13,29 +13,31 @@
   "id": "com.thehunteria.neondash",
   "icons": [
     {
-      "src": "/public/pwa-192x192.png",
+      "src": "/pwa-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/public/pwa-512x512.png",
+      "src": "/pwa-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/public/splash-screen.png",
-      "sizes": "512x512",
+      "src": "/splash-screen.png",
+      "sizes": "1080x1920",
       "type": "image/png",
       "purpose": "any"
     }
   ],
-  "splash_screens": [
+  "screenshots": [
     {
-      "src": "/public/splash-screen.png",
-      "sizes": "512x512",
-      "type": "image/png"
+      "src": "/splash-screen.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Neon Dash Gameplay"
     }
   ]
 }
