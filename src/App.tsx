@@ -23,8 +23,6 @@ export default function App() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [activePowerUp, setActivePowerUp] = useState<{ type: string, end: number } | null>(null);
   const [tick, setTick] = useState(0);
-  const [tilt, setTilt] = useState({ x: 0, y: 0 });
-  const [isTiltEnabled, setIsTiltEnabled] = useState(false);
 
   // Stable refs for values used in callbacks to prevent game loop restarts
   const usernameRef = useRef(username);
@@ -225,47 +223,6 @@ export default function App() {
     }
   }, [isStarted, isGameOver]);
 
-  const toggleTilt = async () => {
-    if (isTiltEnabled) {
-      setIsTiltEnabled(false);
-      return;
-    }
-
-    if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
-      try {
-        const permission = await (DeviceOrientationEvent as any).requestPermission();
-        if (permission === 'granted') {
-          setIsTiltEnabled(true);
-        }
-      } catch (err) {
-        console.error('Permission request failed', err);
-      }
-    } else {
-      // Non-iOS or older browsers
-      setIsTiltEnabled(true);
-    }
-  };
-
-  // Handle Tilt Input
-  useEffect(() => {
-    if (!isTiltEnabled) return;
-
-    const handleOrientation = (e: DeviceOrientationEvent) => {
-      // gamma is left-to-right tilt in degrees [-90, 90]
-      // beta is front-to-back tilt in degrees [-180, 180]
-      const x = (e.gamma || 0) / 15; // Increased sensitivity (was 30)
-      const y = ((e.beta || 0) - 45) / 15; // Increased sensitivity (was 30)
-      
-      setTilt({
-        x: Math.max(-1, Math.min(1, x)),
-        y: Math.max(-1, Math.min(1, y))
-      });
-    };
-
-    window.addEventListener('deviceorientation', handleOrientation);
-    return () => window.removeEventListener('deviceorientation', handleOrientation);
-  }, [isTiltEnabled]);
-
   // Handle Input
   useEffect(() => {
     const keys = new Set<string>();
@@ -348,12 +305,6 @@ export default function App() {
             if (keys.has('ArrowUp') || keys.has('w') || keys.has('W')) nvy -= accel;
             if (keys.has('ArrowDown') || keys.has('s') || keys.has('S')) nvy += accel;
 
-            // Tilt Input
-            if (isTiltEnabled) {
-              nvx += tilt.x * tiltAccel;
-              nvy += tilt.y * tiltAccel;
-            }
-
             nvx *= friction;
             nvy *= friction;
 
@@ -395,7 +346,7 @@ export default function App() {
       window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [isStarted, isGameOver, isPaused, togglePause, isTiltEnabled, tilt]);
+  }, [isStarted, isGameOver, isPaused, togglePause]);
 
   return (
     <div className="relative min-h-screen bg-black text-white selection:bg-neon-cyan selection:text-black overflow-hidden">
@@ -507,20 +458,6 @@ export default function App() {
               >
                 <Trophy size={20} className="text-neon-yellow" />
                 <span className="uppercase tracking-widest text-xs">Leaderboard</span>
-              </button>
-
-              <button 
-                onClick={toggleTilt}
-                className={`flex items-center justify-center gap-3 border py-2 px-8 rounded-full transition-all text-[10px] ${
-                  isTiltEnabled 
-                    ? 'bg-neon-cyan/20 border-neon-cyan text-white shadow-[0_0_10px_rgba(0,243,255,0.3)]' 
-                    : 'bg-white/5 border-white/10 text-white/60 hover:border-neon-cyan hover:text-white'
-                }`}
-              >
-                <RotateCcw size={14} className={isTiltEnabled ? 'text-white' : 'text-neon-cyan'} />
-                <span className="uppercase tracking-widest">
-                  {isTiltEnabled ? 'Giroscópio: ATIVADO' : 'Giroscópio: DESATIVADO'}
-                </span>
               </button>
             </div>
 
@@ -642,7 +579,7 @@ export default function App() {
       {/* Mobile Controls Hint */}
       {!isStarted && (
         <div className="fixed bottom-8 left-0 right-0 text-center text-white/20 text-[10px] uppercase tracking-[0.3em] pointer-events-none px-4">
-          {isTiltEnabled ? 'Incline para dirigir • Arraste para ajuste fino' : 'Deslize para mover • WASD/Setas para Teclado'}
+          Deslize para mover • WASD/Setas para Teclado
         </div>
       )}
     </div>
