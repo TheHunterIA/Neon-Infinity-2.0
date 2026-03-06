@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Game } from './components/Game';
 import { Leaderboard } from './components/Leaderboard';
 import { Play, RotateCcw, Trophy, Share2, Github, Zap, Pause } from 'lucide-react';
+import { supabase } from './lib/supabase';
 
 export default function App() {
   const [isStarted, setIsStarted] = useState(false);
@@ -104,27 +105,30 @@ export default function App() {
     if (username && finalScore > 0) {
       console.log(`Attempting to save score: ${finalScore} for ${username}`);
       try {
-        const response = await fetch('/api/scores', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, score: finalScore }),
-        });
+        const { error: insertError } = await supabase
+          .from('leaderboard')
+          .insert([{ username, score: finalScore }]);
         
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || `Server responded with ${response.status}`);
-        }
+        if (insertError) throw insertError;
         
         console.log('Score saved successfully');
         
         // Fetch leaderboard to find next competitor
-        const lbResponse = await fetch('/api/leaderboard');
-        const lbData = await lbResponse.json();
-        const myRankIndex = lbData.findIndex((s: any) => s.username === username && s.score === finalScore);
-        if (myRankIndex > 0) {
-          setNextCompetitor(lbData[myRankIndex - 1]);
-        } else {
-          setNextCompetitor(null);
+        const { data: lbData, error: lbError } = await supabase
+          .from('leaderboard')
+          .select('*')
+          .order('score', { ascending: false })
+          .limit(100);
+
+        if (lbError) throw lbError;
+
+        if (lbData) {
+          const myRankIndex = lbData.findIndex((s: any) => s.username === username && s.score === finalScore);
+          if (myRankIndex > 0) {
+            setNextCompetitor(lbData[myRankIndex - 1]);
+          } else {
+            setNextCompetitor(null);
+          }
         }
       } catch (err) {
         console.error('Failed to save score', err);

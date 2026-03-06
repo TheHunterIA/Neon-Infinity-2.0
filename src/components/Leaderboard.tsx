@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LeaderboardEntry } from '../types';
 import { Trophy } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 export const Leaderboard: React.FC = () => {
   const [scores, setScores] = useState<LeaderboardEntry[]>([]);
@@ -8,24 +9,26 @@ export const Leaderboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/leaderboard')
-      .then(async res => {
-        if (!res.ok) {
-          const errorData = await res.json().catch(() => ({}));
-          throw new Error(errorData.error || 'Leaderboard API Unavailable');
-        }
-        return res.json();
-      })
-      .then(data => {
-        if (!Array.isArray(data)) throw new Error('Invalid data format');
-        setScores(data);
+    const fetchLeaderboard = async () => {
+      try {
+        const { data, error: fetchError } = await supabase
+          .from('leaderboard')
+          .select('*')
+          .order('score', { ascending: false })
+          .limit(10);
+
+        if (fetchError) throw fetchError;
+        
+        setScores(data || []);
         setLoading(false);
-      })
-      .catch(err => {
+      } catch (err: any) {
         console.error('Failed to fetch leaderboard', err);
         setError(err.message || 'DATABASE OFFLINE: Please ensure Supabase environment variables are configured.');
         setLoading(false);
-      });
+      }
+    };
+
+    fetchLeaderboard();
   }, []);
 
   if (loading) return <div className="text-neon-cyan animate-pulse font-mono text-xs uppercase tracking-widest">Accessing Database...</div>;
