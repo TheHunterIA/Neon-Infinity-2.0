@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'motion/react';
 import { LeaderboardEntry } from '../types';
 import { Trophy } from 'lucide-react';
 import { getSupabase } from '../lib/supabase';
@@ -7,9 +8,12 @@ export const Leaderboard: React.FC = () => {
   const [scores, setScores] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
+      setLoading(true);
+      setError(null);
       const supabase = getSupabase();
       
       if (!supabase) {
@@ -31,21 +35,43 @@ export const Leaderboard: React.FC = () => {
         setLoading(false);
       } catch (err: any) {
         console.error('Failed to fetch leaderboard', err);
-        setError(err.message || 'DATABASE OFFLINE: Please ensure Supabase environment variables are configured.');
+        setError(err.message || 'Failed to connect to leaderboard database.');
         setLoading(false);
       }
     };
 
     fetchLeaderboard();
-  }, []);
+  }, [tick]); // Use a tick to allow manual refresh
 
-  if (loading) return <div className="text-neon-cyan animate-pulse font-mono text-xs uppercase tracking-widest">Accessing Database...</div>;
+  if (loading) return (
+    <div className="flex flex-col items-center gap-4">
+      <div className="text-neon-cyan animate-pulse font-mono text-xs uppercase tracking-widest">Accessing Database...</div>
+      <div className="w-48 h-1 bg-white/5 rounded-full overflow-hidden">
+        <motion.div 
+          initial={{ x: '-100%' }}
+          animate={{ x: '100%' }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+          className="w-full h-full bg-neon-cyan shadow-[0_0_10px_#00f3ff]"
+        />
+      </div>
+    </div>
+  );
+
   if (error) return (
     <div className="w-full max-w-lg bg-black/80 border border-neon-magenta/30 p-6 rounded-2xl backdrop-blur-md">
-      <div className="text-neon-magenta font-mono text-xs uppercase tracking-widest mb-2">System Alert</div>
-      <div className="text-white/60 font-mono text-[10px] leading-relaxed">{error}</div>
-      <div className="mt-4 text-[8px] text-white/20 uppercase tracking-tighter">
-        Note: For Vercel deployment, use Supabase for persistent leaderboard data.
+      <div className="text-neon-magenta font-mono text-xs uppercase tracking-widest mb-2 flex justify-between items-center">
+        <span>System Alert</span>
+        <button 
+          onClick={() => setTick(t => t + 1)}
+          className="text-[8px] border border-neon-magenta/50 px-2 py-1 rounded hover:bg-neon-magenta/20 transition-colors"
+        >
+          Retry Connection
+        </button>
+      </div>
+      <div className="text-white/60 font-mono text-[10px] leading-relaxed mb-4">{error}</div>
+      <div className="text-[8px] text-white/20 uppercase tracking-tighter space-y-1">
+        <p>1. Ensure VITE_SUPABASE_URL & VITE_SUPABASE_ANON_KEY are set in hosting provider.</p>
+        <p>2. Ensure 'leaderboard' table exists with public RLS policies.</p>
       </div>
     </div>
   );

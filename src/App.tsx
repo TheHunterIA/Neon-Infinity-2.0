@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Game } from './components/Game';
 import { Leaderboard } from './components/Leaderboard';
@@ -40,7 +40,11 @@ export default function App() {
     }
   }, [score, highScore]);
 
+  const isGameOverRef = useRef(false);
+
   const handleGameOver = React.useCallback(async (finalScore: number) => {
+    if (isGameOverRef.current) return;
+    isGameOverRef.current = true;
     setIsGameOver(true);
     setLastFinalScore(finalScore);
     
@@ -102,6 +106,16 @@ export default function App() {
       }
     }
 
+    // Instant-ish restart after 2.5 seconds (independent of Supabase)
+    setTimeout(() => {
+      isGameOverRef.current = false;
+      setIsStarted(true);
+      setIsGameOver(false);
+      setScore(0);
+      setNextCompetitor(null);
+      setPlayerPos({ x: 0.5, y: 0.8, vx: 0, vy: 0 });
+    }, 2500);
+
     if (username && finalScore > 0) {
       console.log(`Attempting to save score: ${finalScore} for ${username}`);
       const supabase = getSupabase();
@@ -141,15 +155,6 @@ export default function App() {
         console.error('Failed to save score', err);
       }
     }
-
-    // Instant-ish restart after 800ms
-    setTimeout(() => {
-      setIsStarted(true);
-      setIsGameOver(false);
-      setScore(0);
-      setNextCompetitor(null);
-      setPlayerPos({ x: 0.5, y: 0.8, vx: 0, vy: 0 });
-    }, 800);
   }, [username, highScore]);
 
   const handleScoreUpdate = React.useCallback((newScore: number) => {
@@ -168,6 +173,7 @@ export default function App() {
     
     setIsStarted(true);
     setIsGameOver(false);
+    isGameOverRef.current = false;
     setIsPaused(false);
     setScore(0);
     setShowLeaderboard(false);
@@ -526,9 +532,23 @@ export default function App() {
                 </motion.div>
               )}
 
-              <div className="text-[10px] text-white/30 uppercase tracking-[0.5em] animate-pulse">
+              <div className="text-[10px] text-white/30 uppercase tracking-[0.5em] animate-pulse mb-8">
                 Auto-Rebooting Protocol...
               </div>
+
+              <button 
+                onClick={() => {
+                  isGameOverRef.current = false;
+                  setIsStarted(true);
+                  setIsGameOver(false);
+                  setScore(0);
+                  setNextCompetitor(null);
+                  setPlayerPos({ x: 0.5, y: 0.8, vx: 0, vy: 0 });
+                }}
+                className="bg-white/5 border border-white/20 hover:border-neon-cyan text-white/60 hover:text-white px-6 py-2 rounded-full text-[10px] uppercase tracking-widest transition-all"
+              >
+                Manual Override (Restart)
+              </button>
             </motion.div>
           </motion.div>
         )}
