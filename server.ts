@@ -9,30 +9,31 @@ dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Initialize Supabase client
-const sanitize = (val: string | undefined) => val?.replace(/['"]/g, "").trim() || "";
+// Função de limpeza robusta para variáveis de ambiente
+const sanitize = (val: string | undefined) => 
+  val?.replace(/['"]/g, "").trim() || "";
 
-const supabaseUrl = sanitize(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL);
+// Priorização correta para ambientes Vercel e Supabase
+const supabaseUrl = sanitize(
+  process.env.SUPABASE_URL || 
+  process.env.NEXT_PUBLIC_SUPABASE_URL
+);
+
+// Alterado para priorizar ANON_KEY e evitar chaves de gerenciamento (sb_secret)
 const supabaseKey = sanitize(
-  process.env.SUPABASE_SERVICE_ROLE_KEY || 
-  process.env.SUPABASE_SECRET_KEY || 
   process.env.SUPABASE_ANON_KEY || 
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
 if (!supabaseUrl || !supabaseKey) {
-  console.warn("⚠️ Supabase credentials missing. Leaderboard will be disabled.");
+  console.warn("⚠️ Credenciais do Supabase ausentes ou inválidas. Leaderboard desativado.");
 } else {
-  console.log(`📡 Initializing Supabase with URL: ${supabaseUrl.substring(0, 20)}...`);
-  console.log(`🔑 Using Key starting with: ${supabaseKey.substring(0, 10)}...`);
-  
-  if (!supabaseUrl.startsWith("https://")) {
-    console.error("❌ Invalid SUPABASE_URL: Must start with https://");
-  }
+  console.log(`📡 Conectando ao Supabase: ${supabaseUrl.substring(0, 25)}...`);
 }
 
 const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
+const tableName = process.env.SUPABASE_TABLE_NAME || 'leaderboard';
 
 async function startServer() {
   const app = express();
@@ -40,108 +41,50 @@ async function startServer() {
 
   app.use(express.json());
 
-  // Diagnostic Route
-  app.get("/api/debug/supabase", async (req, res) => {
-    if (!supabase) {
-      return res.status(503).json({ 
-        status: "error", 
-        message: "Supabase client not initialized",
-        env: {
-          hasUrl: !!supabaseUrl,
-          hasKey: !!supabaseKey,
-          urlStart: supabaseUrl?.substring(0, 10),
-          keyStart: supabaseKey?.substring(0, 10)
-        }
-      });
-    }
-
-    try {
-      // Try to fetch 1 row from leaderboard
-      const { data, error, status } = await supabase
-        .from("leaderboard")
-        .select("count", { count: "exact", head: true });
-
-      if (error) {
-        return res.status(status || 500).json({ 
-          status: "error", 
-          message: error.message, 
-          code: error.code,
-          hint: error.hint,
-          details: error 
-        });
-      }
-
-      res.json({ 
-        status: "ok", 
-        message: "Connected to Supabase successfully",
-        tableExists: true
-      });
-    } catch (err: any) {
-      res.status(500).json({ status: "error", message: err.message });
-    }
+  // API Routes
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok" });
   });
 
-  // API Routes
   app.get("/api/leaderboard", async (req, res) => {
+    if (!supabase) {
+      return res.status(503).json({ error: "Supabase not configured" });
+    }
     try {
-      if (!supabase) {
-        console.error("Supabase client not initialized - missing environment variables");
-        return res.status(503).json({ error: "Supabase not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY." });
-      }
-      
       const { data, error } = await supabase
-        .from("leaderboard")
-        .select("metadata, score")
-        .order("score", { ascending: false })
+        .from(tableName)
+        .select('*')
+        .order('score', { ascending: false })
         .limit(10);
 
-      if (error) {
-        console.error("Supabase select error:", JSON.stringify(error, null, 2));
-        return res.status(500).json({ error: error.message, details: error });
-      }
-
-      // Map metadata.username to username for the frontend
-      const mappedData = (data || []).map((entry: any) => ({
-        username: entry.metadata?.username || "Unknown Dasher",
-        score: entry.score
-      }));
-
-      res.json(mappedData);
+      if (error) throw error;
+      res.json(data || []);
     } catch (err: any) {
-      console.error("Internal server error during leaderboard fetch:", err);
-      res.status(500).json({ error: err.message || "Internal server error" });
+      console.error('Error fetching leaderboard:', err);
+      res.status(500).json({ error: err.message });
     }
   });
 
   app.post("/api/scores", async (req, res) => {
+    if (!supabase) {
+      return res.status(503).json({ error: "Supabase not configured" });
+    }
     const { username, score } = req.body;
-    
-    if (!username || typeof score !== "number") {
-      return res.status(400).json({ error: "Invalid data: username (string) and score (number) are required" });
+    if (!username || typeof score !== 'number') {
+      return res.status(400).json({ error: "Invalid score data" });
     }
 
     try {
-      if (!supabase) {
-        return res.status(503).json({ error: "Supabase not configured" });
-      }
+      const { data, error } = await supabase
+        .from(tableName)
+        .insert([{ username, score }])
+        .select();
 
-      const { error } = await supabase
-        .from("leaderboard")
-        .insert([{ 
-          user_id: "00000000-0000-0000-0000-000000000000", // Placeholder for guest
-          score, 
-          metadata: { username } 
-        }]);
-
-      if (error) {
-        console.error("Supabase insert error:", JSON.stringify(error, null, 2));
-        return res.status(500).json({ error: error.message, details: error });
-      }
-      
-      res.json({ success: true });
+      if (error) throw error;
+      res.json({ success: true, data });
     } catch (err: any) {
-      console.error("Internal server error during score save:", err);
-      res.status(500).json({ error: err.message || "Internal server error" });
+      console.error('Error saving score:', err);
+      res.status(500).json({ error: err.message });
     }
   });
 
