@@ -147,17 +147,32 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
       ctx.save();
       ctx.translate(x, y);
       
-      const level = Math.min(5, Math.floor(score / 1000));
-      let shipScale = (laneWidth / 100) * (1 + level * 0.05);
+      // Level every 2000 points up to 20000 (Level 0 to 10)
+      const level = Math.min(10, Math.floor(score / 2000));
+      let shipScale = (laneWidth / 100) * (1 + level * 0.04);
       if (powerUpActiveRef.current?.type === 'shrink') shipScale *= 0.5;
       
       const shipWidth = 25 * shipScale;
       const shipHeight = 30 * shipScale;
 
+      // Danger Glitch Effect: If very close to an obstacle, flicker the ship
+      const isDanger = obstaclesRef.current.some(obs => {
+        if (obs.type === 'powerup') return false;
+        const dx = x - (obs.x + obs.width / 2);
+        const dy = y - (obs.y + obs.height / 2);
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        return dist < 100 * shipScale;
+      });
+
+      if (isDanger && Math.random() > 0.8) {
+        ctx.translate((Math.random() - 0.5) * 5, (Math.random() - 0.5) * 5);
+        ctx.globalAlpha = 0.7;
+      }
+
       // --- Power-up Aura Effects ---
       if (powerUpActiveRef.current?.type === 'shield') {
         ctx.beginPath();
-        ctx.arc(0, 0, (45 + level * 5) * shipScale, 0, Math.PI * 2);
+        ctx.arc(0, 0, (45 + level * 3) * shipScale, 0, Math.PI * 2);
         ctx.strokeStyle = '#00f3ff';
         ctx.lineWidth = 2;
         ctx.setLineDash([5, 15]);
@@ -183,9 +198,9 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
       }
 
       // --- Ship Design Evolution ---
-      ctx.shadowBlur = 15 + level * 5;
+      ctx.shadowBlur = 15 + level * 4;
       ctx.shadowColor = themeColor;
-      ctx.lineWidth = 1.5 + level * 0.3;
+      ctx.lineWidth = 1.5 + level * 0.2;
       ctx.lineJoin = 'round';
 
       const drawEngineGlow = (ex: number, ey: number, ew: number, eh: number, color: string) => {
@@ -218,142 +233,245 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
       ctx.fillStyle = '#050505';
       ctx.strokeStyle = themeColor;
 
-      if (level === 0) {
-        // Level 0: Sleek Scout
+      // Helper for complex polygons
+      const drawPoly = (points: {x: number, y: number}[]) => {
         ctx.beginPath();
-        ctx.moveTo(0, -shipHeight);
-        ctx.lineTo(-shipWidth * 0.7, shipHeight * 0.5);
-        ctx.lineTo(-shipWidth * 0.3, shipHeight * 0.5);
-        ctx.lineTo(-shipWidth * 0.3, shipHeight * 0.7);
-        ctx.lineTo(shipWidth * 0.3, shipHeight * 0.7);
-        ctx.lineTo(shipWidth * 0.3, shipHeight * 0.5);
-        ctx.lineTo(shipWidth * 0.7, shipHeight * 0.5);
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
         ctx.closePath();
         ctx.fill(); ctx.stroke();
+      };
+
+      if (level === 0) {
+        // Level 0: Scout (0-2k)
+        drawPoly([
+          {x: 0, y: -shipHeight},
+          {x: -shipWidth * 0.7, y: shipHeight * 0.5},
+          {x: -shipWidth * 0.3, y: shipHeight * 0.5},
+          {x: -shipWidth * 0.3, y: shipHeight * 0.7},
+          {x: shipWidth * 0.3, y: shipHeight * 0.7},
+          {x: shipWidth * 0.3, y: shipHeight * 0.5},
+          {x: shipWidth * 0.7, y: shipHeight * 0.5}
+        ]);
         drawCockpit(0, -shipHeight * 0.2, shipWidth * 0.2, shipHeight * 0.3);
         drawEngineGlow(0, shipHeight * 0.7, shipWidth * 0.4, shipHeight * 0.5, themeColor);
       } else if (level === 1) {
-        // Level 1: Winged Fighter
-        ctx.beginPath();
-        ctx.moveTo(0, -shipHeight * 1.1);
-        ctx.lineTo(-shipWidth * 0.4, -shipHeight * 0.2);
-        ctx.lineTo(-shipWidth * 1.2, shipHeight * 0.4);
-        ctx.lineTo(-shipWidth * 0.5, shipHeight * 0.4);
-        ctx.lineTo(-shipWidth * 0.5, shipHeight * 0.8);
-        ctx.lineTo(shipWidth * 0.5, shipHeight * 0.8);
-        ctx.lineTo(shipWidth * 0.5, shipHeight * 0.4);
-        ctx.lineTo(shipWidth * 1.2, shipHeight * 0.4);
-        ctx.lineTo(shipWidth * 0.4, -shipHeight * 0.2);
-        ctx.closePath();
-        ctx.fill(); ctx.stroke();
+        // Level 1: Striker (2k-4k)
+        drawPoly([
+          {x: 0, y: -shipHeight * 1.1},
+          {x: -shipWidth * 0.4, y: -shipHeight * 0.2},
+          {x: -shipWidth * 1.2, y: shipHeight * 0.4},
+          {x: -shipWidth * 0.5, y: shipHeight * 0.4},
+          {x: -shipWidth * 0.5, y: shipHeight * 0.8},
+          {x: shipWidth * 0.5, y: shipHeight * 0.8},
+          {x: shipWidth * 0.5, y: shipHeight * 0.4},
+          {x: shipWidth * 1.2, y: shipHeight * 0.4},
+          {x: shipWidth * 0.4, y: -shipHeight * 0.2}
+        ]);
         drawCockpit(0, -shipHeight * 0.3, shipWidth * 0.25, shipHeight * 0.35);
         drawEngineGlow(-shipWidth * 0.3, shipHeight * 0.8, shipWidth * 0.3, shipHeight * 0.6, themeColor);
         drawEngineGlow(shipWidth * 0.3, shipHeight * 0.8, shipWidth * 0.3, shipHeight * 0.6, themeColor);
       } else if (level === 2) {
-        // Level 2: Twin-Hull Interceptor
+        // Level 2: Twin-Hull Interceptor (4k-6k)
+        ctx.save();
         // Left Hull
-        ctx.beginPath();
-        ctx.moveTo(-shipWidth * 0.4, -shipHeight * 1.2);
-        ctx.lineTo(-shipWidth * 0.8, shipHeight * 0.6);
-        ctx.lineTo(-shipWidth * 0.2, shipHeight * 0.6);
-        ctx.closePath();
-        ctx.fill(); ctx.stroke();
+        drawPoly([
+          {x: -shipWidth * 0.4, y: -shipHeight * 1.2},
+          {x: -shipWidth * 0.8, y: shipHeight * 0.6},
+          {x: -shipWidth * 0.2, y: shipHeight * 0.6}
+        ]);
         // Right Hull
-        ctx.beginPath();
-        ctx.moveTo(shipWidth * 0.4, -shipHeight * 1.2);
-        ctx.lineTo(shipWidth * 0.8, shipHeight * 0.6);
-        ctx.lineTo(shipWidth * 0.2, shipHeight * 0.6);
-        ctx.closePath();
-        ctx.fill(); ctx.stroke();
+        drawPoly([
+          {x: shipWidth * 0.4, y: -shipHeight * 1.2},
+          {x: shipWidth * 0.8, y: shipHeight * 0.6},
+          {x: shipWidth * 0.2, y: shipHeight * 0.6}
+        ]);
         // Bridge
         ctx.fillRect(-shipWidth * 0.4, -shipHeight * 0.2, shipWidth * 0.8, shipHeight * 0.4);
         ctx.strokeRect(-shipWidth * 0.4, -shipHeight * 0.2, shipWidth * 0.8, shipHeight * 0.4);
         drawCockpit(0, -shipHeight * 0.1, shipWidth * 0.3, shipHeight * 0.2);
         drawEngineGlow(-shipWidth * 0.5, shipHeight * 0.6, shipWidth * 0.4, shipHeight * 0.7, themeColor);
         drawEngineGlow(shipWidth * 0.5, shipHeight * 0.6, shipWidth * 0.4, shipHeight * 0.7, themeColor);
-        drawEngineGlow(0, shipHeight * 0.2, shipWidth * 0.2, shipHeight * 0.4, themeColor);
+        ctx.restore();
       } else if (level === 3) {
-        // Level 3: Heavy Destroyer
-        ctx.beginPath();
-        ctx.moveTo(0, -shipHeight * 1.3);
-        ctx.lineTo(-shipWidth * 0.6, -shipHeight * 0.5);
-        ctx.lineTo(-shipWidth * 1.6, shipHeight * 0.2);
-        ctx.lineTo(-shipWidth * 1.6, shipHeight * 0.8);
-        ctx.lineTo(-shipWidth * 0.8, shipHeight * 0.8);
-        ctx.lineTo(-shipWidth * 0.8, shipHeight * 1.0);
-        ctx.lineTo(shipWidth * 0.8, shipHeight * 1.0);
-        ctx.lineTo(shipWidth * 0.8, shipHeight * 0.8);
-        ctx.lineTo(shipWidth * 1.6, shipHeight * 0.8);
-        ctx.lineTo(shipWidth * 1.6, shipHeight * 0.2);
-        ctx.lineTo(shipWidth * 0.6, -shipHeight * 0.5);
-        ctx.closePath();
-        ctx.fill(); ctx.stroke();
-        // Tech details
+        // Level 3: Heavy Destroyer (6k-8k)
+        drawPoly([
+          {x: 0, y: -shipHeight * 1.3},
+          {x: -shipWidth * 0.6, y: -shipHeight * 0.5},
+          {x: -shipWidth * 1.6, y: shipHeight * 0.2},
+          {x: -shipWidth * 1.6, y: shipHeight * 0.8},
+          {x: -shipWidth * 0.8, y: shipHeight * 0.8},
+          {x: -shipWidth * 0.8, y: shipHeight * 1.0},
+          {x: shipWidth * 0.8, y: shipHeight * 1.0},
+          {x: shipWidth * 0.8, y: shipHeight * 0.8},
+          {x: shipWidth * 1.6, y: shipHeight * 0.8},
+          {x: shipWidth * 1.6, y: shipHeight * 0.2},
+          {x: shipWidth * 0.6, y: -shipHeight * 0.5}
+        ]);
         ctx.strokeRect(-shipWidth * 0.4, -shipHeight * 0.8, shipWidth * 0.8, shipHeight * 1.2);
         drawCockpit(0, -shipHeight * 0.6, shipWidth * 0.3, shipHeight * 0.4);
         drawEngineGlow(-shipWidth * 1.2, shipHeight * 0.8, shipWidth * 0.4, shipHeight * 0.8, themeColor);
         drawEngineGlow(shipWidth * 1.2, shipHeight * 0.8, shipWidth * 0.4, shipHeight * 0.8, themeColor);
-        drawEngineGlow(-shipWidth * 0.4, shipHeight * 1.0, shipWidth * 0.4, shipHeight * 0.8, themeColor);
-        drawEngineGlow(shipWidth * 0.4, shipHeight * 1.0, shipWidth * 0.4, shipHeight * 0.8, themeColor);
       } else if (level === 4) {
-        // Level 4: Elite Vanguard
-        ctx.beginPath();
-        ctx.moveTo(0, -shipHeight * 1.5);
-        ctx.lineTo(-shipWidth * 0.5, -shipHeight * 0.7);
-        ctx.lineTo(-shipWidth * 2.0, -shipHeight * 0.2);
-        ctx.lineTo(-shipWidth * 1.5, shipHeight * 0.8);
-        ctx.lineTo(-shipWidth * 0.5, shipHeight * 0.5);
-        ctx.lineTo(-shipWidth * 0.5, shipHeight * 1.2);
-        ctx.lineTo(shipWidth * 0.5, shipHeight * 1.2);
-        ctx.lineTo(shipWidth * 0.5, shipHeight * 0.5);
-        ctx.lineTo(shipWidth * 1.5, shipHeight * 0.8);
-        ctx.lineTo(shipWidth * 2.0, -shipHeight * 0.2);
-        ctx.lineTo(shipWidth * 0.5, -shipHeight * 0.7);
-        ctx.closePath();
-        ctx.fill(); ctx.stroke();
-        // Glowing conduits
-        ctx.beginPath();
-        ctx.moveTo(-shipWidth * 0.3, -shipHeight); ctx.lineTo(-shipWidth * 0.3, shipHeight);
-        ctx.moveTo(shipWidth * 0.3, -shipHeight); ctx.lineTo(shipWidth * 0.3, shipHeight);
-        ctx.stroke();
+        // Level 4: Elite Vanguard (8k-10k)
+        drawPoly([
+          {x: 0, y: -shipHeight * 1.5},
+          {x: -shipWidth * 0.5, y: -shipHeight * 0.7},
+          {x: -shipWidth * 2.0, y: -shipHeight * 0.2},
+          {x: -shipWidth * 1.5, y: shipHeight * 0.8},
+          {x: -shipWidth * 0.5, y: shipHeight * 0.5},
+          {x: -shipWidth * 0.5, y: shipHeight * 1.2},
+          {x: shipWidth * 0.5, y: shipHeight * 1.2},
+          {x: shipWidth * 0.5, y: shipHeight * 0.5},
+          {x: shipWidth * 1.5, y: shipHeight * 0.8},
+          {x: shipWidth * 2.0, y: -shipHeight * 0.2},
+          {x: shipWidth * 0.5, y: -shipHeight * 0.7}
+        ]);
         drawCockpit(0, -shipHeight * 0.8, shipWidth * 0.35, shipHeight * 0.5);
         drawEngineGlow(-shipWidth * 1.0, shipHeight * 0.8, shipWidth * 0.5, shipHeight * 1.0, themeColor);
         drawEngineGlow(shipWidth * 1.0, shipHeight * 0.8, shipWidth * 0.5, shipHeight * 1.0, themeColor);
         drawEngineGlow(0, shipHeight * 1.2, shipWidth * 0.6, shipHeight * 1.2, themeColor);
-      } else {
-        // Level 5: Neon God
-        const pulse = Math.sin(time * 0.01) * 10;
-        // Central Core
+      } else if (level === 5) {
+        // Level 5: Sentinel Cruiser (10k-12k)
+        drawPoly([
+          {x: 0, y: -shipHeight * 1.6},
+          {x: -shipWidth * 0.8, y: -shipHeight * 0.8},
+          {x: -shipWidth * 2.2, y: 0},
+          {x: -shipWidth * 2.2, y: shipHeight * 0.6},
+          {x: -shipWidth * 0.8, y: shipHeight * 1.2},
+          {x: shipWidth * 0.8, y: shipHeight * 1.2},
+          {x: shipWidth * 2.2, y: shipHeight * 0.6},
+          {x: shipWidth * 2.2, y: 0},
+          {x: shipWidth * 0.8, y: -shipHeight * 0.8}
+        ]);
+        // Side pods
+        ctx.strokeRect(-shipWidth * 1.8, -shipHeight * 0.2, shipWidth * 0.6, shipHeight * 0.8);
+        ctx.strokeRect(shipWidth * 1.2, -shipHeight * 0.2, shipWidth * 0.6, shipHeight * 0.8);
+        drawCockpit(0, -shipHeight * 0.9, shipWidth * 0.4, shipHeight * 0.6);
+        drawEngineGlow(-shipWidth * 1.5, shipHeight * 0.6, shipWidth * 0.4, shipHeight * 1.0, themeColor);
+        drawEngineGlow(shipWidth * 1.5, shipHeight * 0.6, shipWidth * 0.4, shipHeight * 1.0, themeColor);
+        drawEngineGlow(0, shipHeight * 1.2, shipWidth * 0.8, shipHeight * 1.4, themeColor);
+      } else if (level === 6) {
+        // Level 6: Dreadnought (12k-14k)
+        drawPoly([
+          {x: 0, y: -shipHeight * 1.8},
+          {x: -shipWidth * 1.2, y: -shipHeight * 0.6},
+          {x: -shipWidth * 2.5, y: shipHeight * 0.2},
+          {x: -shipWidth * 2.5, y: shipHeight * 1.0},
+          {x: -shipWidth * 1.0, y: shipHeight * 1.4},
+          {x: shipWidth * 1.0, y: shipHeight * 1.4},
+          {x: shipWidth * 2.5, y: shipHeight * 1.0},
+          {x: shipWidth * 2.5, y: shipHeight * 0.2},
+          {x: shipWidth * 1.2, y: -shipHeight * 0.6}
+        ]);
+        // Armor plates
+        ctx.strokeRect(-shipWidth * 0.8, -shipHeight * 1.2, shipWidth * 1.6, shipHeight * 2.0);
+        drawCockpit(0, -shipHeight * 1.0, shipWidth * 0.5, shipHeight * 0.7);
+        drawEngineGlow(-shipWidth * 1.8, shipHeight * 1.0, shipWidth * 0.6, shipHeight * 1.2, themeColor);
+        drawEngineGlow(shipWidth * 1.8, shipHeight * 1.0, shipWidth * 0.6, shipHeight * 1.2, themeColor);
+        drawEngineGlow(0, shipHeight * 1.4, shipWidth * 1.0, shipHeight * 1.6, themeColor);
+      } else if (level === 7) {
+        // Level 7: Star-Eater (14k-16k)
+        drawPoly([
+          {x: 0, y: -shipHeight * 2.0},
+          {x: -shipWidth * 0.6, y: -shipHeight * 1.0},
+          {x: -shipWidth * 3.0, y: -shipHeight * 0.5},
+          {x: -shipWidth * 2.0, y: shipHeight * 1.2},
+          {x: -shipWidth * 0.8, y: shipHeight * 0.8},
+          {x: -shipWidth * 0.8, y: shipHeight * 1.6},
+          {x: shipWidth * 0.8, y: shipHeight * 1.6},
+          {x: shipWidth * 0.8, y: shipHeight * 0.8},
+          {x: shipWidth * 2.0, y: shipHeight * 1.2},
+          {x: shipWidth * 3.0, y: -shipHeight * 0.5},
+          {x: shipWidth * 0.6, y: -shipHeight * 1.0}
+        ]);
+        // Glowing core
         ctx.beginPath();
-        ctx.arc(0, 0, shipWidth * 0.8, 0, Math.PI * 2);
-        ctx.fill(); ctx.stroke();
+        ctx.arc(0, 0, shipWidth * 0.6, 0, Math.PI * 2);
+        ctx.stroke();
+        drawCockpit(0, -shipHeight * 1.2, shipWidth * 0.4, shipHeight * 0.6);
+        drawEngineGlow(-shipWidth * 2.0, shipHeight * 1.2, shipWidth * 0.8, shipHeight * 1.4, themeColor);
+        drawEngineGlow(shipWidth * 2.0, shipHeight * 1.2, shipWidth * 0.8, shipHeight * 1.4, themeColor);
+        drawEngineGlow(0, shipHeight * 1.6, shipWidth * 1.2, shipHeight * 1.8, themeColor);
+      } else if (level === 8) {
+        // Level 8: Void-Walker (16k-18k)
+        const float = Math.sin(time * 0.005) * 10;
+        // Central Body
+        drawPoly([
+          {x: 0, y: -shipHeight * 1.5},
+          {x: -shipWidth * 1.0, y: 0},
+          {x: 0, y: shipHeight * 1.5},
+          {x: shipWidth * 1.0, y: 0}
+        ]);
         // Floating Wings
-        const wingOffset = 10 + Math.sin(time * 0.005) * 5;
-        ctx.beginPath();
-        ctx.moveTo(-shipWidth * 0.8 - wingOffset, -shipHeight * 1.5);
-        ctx.lineTo(-shipWidth * 2.5 - wingOffset, shipHeight * 0.5);
-        ctx.lineTo(-shipWidth * 1.2 - wingOffset, shipHeight * 1.2);
-        ctx.closePath();
-        ctx.fill(); ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(shipWidth * 0.8 + wingOffset, -shipHeight * 1.5);
-        ctx.lineTo(shipWidth * 2.5 + wingOffset, shipHeight * 0.5);
-        ctx.lineTo(shipWidth * 1.2 + wingOffset, shipHeight * 1.2);
-        ctx.closePath();
-        ctx.fill(); ctx.stroke();
-        // Energy Core
+        ctx.save();
+        ctx.translate(-shipWidth * 1.5 - float, 0);
+        drawPoly([
+          {x: 0, y: -shipHeight * 1.8},
+          {x: -shipWidth * 1.5, y: 0},
+          {x: 0, y: shipHeight * 1.8}
+        ]);
+        ctx.restore();
+        ctx.save();
+        ctx.translate(shipWidth * 1.5 + float, 0);
+        drawPoly([
+          {x: 0, y: -shipHeight * 1.8},
+          {x: shipWidth * 1.5, y: 0},
+          {x: 0, y: shipHeight * 1.8}
+        ]);
+        ctx.restore();
+        drawCockpit(0, -shipHeight * 0.5, shipWidth * 0.5, shipHeight * 0.8);
+        drawEngineGlow(0, shipHeight * 1.5, shipWidth * 1.0, shipHeight * 2.0, themeColor);
+      } else if (level === 9) {
+        // Level 9: Neon Overlord (18k-20k)
+        const pulse = Math.sin(time * 0.01) * 15;
         ctx.shadowBlur = 30 + pulse;
-        ctx.fillStyle = themeColor;
+        drawPoly([
+          {x: 0, y: -shipHeight * 2.2},
+          {x: -shipWidth * 1.5, y: -shipHeight * 0.5},
+          {x: -shipWidth * 3.5, y: shipHeight * 0.5},
+          {x: -shipWidth * 1.5, y: shipHeight * 1.5},
+          {x: 0, y: shipHeight * 1.0},
+          {x: shipWidth * 1.5, y: shipHeight * 1.5},
+          {x: shipWidth * 3.5, y: shipHeight * 0.5},
+          {x: shipWidth * 1.5, y: -shipHeight * 0.5}
+        ]);
+        // Energy rings
         ctx.beginPath();
-        ctx.arc(0, 0, shipWidth * 0.4, 0, Math.PI * 2);
-        ctx.fill();
-        drawCockpit(0, -shipHeight * 0.4, shipWidth * 0.2, shipHeight * 0.3);
-        drawEngineGlow(0, shipHeight * 0.8, shipWidth * 1.2, shipHeight * 2.0, themeColor);
+        ctx.arc(0, 0, shipWidth * 1.2 + pulse * 0.2, 0, Math.PI * 2);
+        ctx.stroke();
+        drawCockpit(0, -shipHeight * 1.4, shipWidth * 0.6, shipHeight * 0.8);
+        drawEngineGlow(-shipWidth * 2.0, shipHeight * 1.5, shipWidth * 1.0, shipHeight * 2.0, themeColor);
+        drawEngineGlow(shipWidth * 2.0, shipHeight * 1.5, shipWidth * 1.0, shipHeight * 2.0, themeColor);
+        drawEngineGlow(0, shipHeight * 1.0, shipWidth * 1.5, shipHeight * 2.5, themeColor);
+      } else {
+        // Level 10: Infinity God (20k+)
+        const pulse = Math.sin(time * 0.01) * 20;
+        const rot = time * 0.002;
+        ctx.shadowBlur = 40 + pulse;
+        // Core
+        ctx.beginPath();
+        ctx.arc(0, 0, shipWidth * 1.5, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+        // Orbiting shards
+        for (let i = 0; i < 4; i++) {
+          ctx.save();
+          ctx.rotate(rot + (i * Math.PI / 2));
+          ctx.translate(shipWidth * 3 + pulse * 0.5, 0);
+          drawPoly([
+            {x: shipWidth * 0.8, y: 0},
+            {x: -shipWidth * 0.4, y: -shipHeight * 0.6},
+            {x: -shipWidth * 0.4, y: shipHeight * 0.6}
+          ]);
+          ctx.restore();
+        }
+        drawCockpit(0, 0, shipWidth * 0.8, shipHeight * 0.8);
+        drawEngineGlow(0, 0, shipWidth * 2.0, shipHeight * 4.0, themeColor);
         // Aura
         ctx.save();
-        ctx.globalAlpha = 0.2 + Math.sin(time * 0.005) * 0.1;
+        ctx.globalAlpha = 0.3 + Math.sin(time * 0.005) * 0.1;
         ctx.beginPath();
-        ctx.arc(0, 0, 80 * shipScale, 0, Math.PI * 2);
+        ctx.arc(0, 0, 120 * shipScale, 0, Math.PI * 2);
         ctx.fillStyle = themeColor;
         ctx.fill();
         ctx.restore();
@@ -419,19 +537,19 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
       const playerY = (playerPosRef.current.y * canvas.height) + shakeY;
 
       // Ship Evolution Check
-      const currentLevel = Math.min(5, Math.floor(scoreRef.current / 1000));
+      const currentLevel = Math.min(10, Math.floor(scoreRef.current / 2000));
       if (currentLevel > lastLevelRef.current) {
         lastLevelRef.current = currentLevel;
-        const levelBonus = currentLevel * 500;
+        const levelBonus = currentLevel * 1000;
         scoreRef.current += levelBonus;
         onScoreUpdate(scoreRef.current);
         
         floatingTextsRef.current.push({
           x: playerX, y: playerY - 80,
-          text: `EVOLVED! +${levelBonus}`,
+          text: `EVOLVED! LEVEL ${currentLevel}`,
           life: 2, color: '#00f3ff'
         });
-        shakeRef.current = 20;
+        shakeRef.current = 25;
       }
 
       let themeColor = '#00f3ff';
@@ -521,8 +639,6 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
         if (obs.type === 'powerup') {
           const bounce = Math.sin(time * 0.01) * 5;
           ctx.translate(obs.x + obs.width / 2, obs.y + obs.height / 2 + bounce);
-          ctx.rotate(time * 0.005);
-          ctx.shadowBlur = 25;
           
           let pColor = '#fff01f'; // Default multiplier
           if (obs.powerUpType === 'shield') pColor = '#00f3ff';
@@ -533,13 +649,38 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
           if (obs.powerUpType === 'shrink') pColor = '#00ffcc';
           if (obs.powerUpType === 'turbo') pColor = '#ff8800';
 
+          ctx.shadowBlur = 30;
           ctx.shadowColor = pColor;
+          
+          // Outer Tech Rings
+          ctx.save();
+          ctx.rotate(time * 0.003);
+          ctx.strokeStyle = pColor;
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([10, 20]);
+          ctx.beginPath();
+          ctx.arc(0, 0, 25, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+
+          ctx.save();
+          ctx.rotate(-time * 0.005);
+          ctx.strokeStyle = pColor;
+          ctx.lineWidth = 1;
+          ctx.setLineDash([5, 10]);
+          ctx.beginPath();
+          ctx.arc(0, 0, 20, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+
+          // Core Icon
+          ctx.rotate(time * 0.005);
           ctx.fillStyle = pColor;
           
-          // Draw Star
+          // Draw Star/Core
           const spikes = 5;
-          const outerRadius = 18;
-          const innerRadius = 8;
+          const outerRadius = 14;
+          const innerRadius = 6;
           let rot = Math.PI / 2 * 3;
           let x_pos = 0;
           let y_pos = 0;
@@ -561,21 +702,26 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
           ctx.lineTo(0, -outerRadius);
           ctx.closePath();
           ctx.fill();
-          ctx.strokeStyle = '#fff';
-          ctx.lineWidth = 2;
-          ctx.stroke();
+          
+          // Inner Glow
+          ctx.globalAlpha = 0.5 + Math.sin(time * 0.01) * 0.3;
+          ctx.beginPath();
+          ctx.arc(0, 0, 8, 0, Math.PI * 2);
+          ctx.fillStyle = '#fff';
+          ctx.fill();
+          ctx.globalAlpha = 1;
         } else {
-          // Asteroid Obstacle
+          // Asteroid Obstacle: Enhanced Crystalline Design
           ctx.translate(obs.x + obs.width / 2, obs.y + obs.height / 2);
           const color = `hsl(${obs.hue}, 100%, 50%)`;
-          ctx.shadowBlur = 20;
+          ctx.shadowBlur = 25;
           ctx.shadowColor = color;
           ctx.rotate(time * 0.002);
           
-          // Draw irregular body
-          ctx.fillStyle = '#111';
+          // Draw irregular body with crystalline facets
+          ctx.fillStyle = '#0a0a0a';
           ctx.strokeStyle = color;
-          ctx.lineWidth = 3;
+          ctx.lineWidth = 2.5;
           ctx.beginPath();
           if (obs.points && obs.points.length > 0) {
             ctx.moveTo(obs.points[0].x, obs.points[0].y);
@@ -589,15 +735,37 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
           ctx.fill();
           ctx.stroke();
 
-          // Add Craters for texture
-          ctx.globalAlpha = 0.5;
-          ctx.strokeStyle = color;
+          // Crystalline Facets
+          if (obs.points && obs.points.length > 0) {
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.globalAlpha = 0.3;
+            ctx.lineWidth = 1;
+            for (let i = 0; i < obs.points.length; i++) {
+              ctx.moveTo(0, 0);
+              ctx.lineTo(obs.points[i].x, obs.points[i].y);
+            }
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+          }
+
+          // Glowing Core
+          const corePulse = Math.sin(time * 0.01) * 2;
+          ctx.beginPath();
+          ctx.arc(0, 0, obs.width * 0.15 + corePulse, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.shadowBlur = 15;
+          ctx.fill();
+
+          // Add Craters/Details
+          ctx.globalAlpha = 0.4;
+          ctx.strokeStyle = '#fff';
           ctx.lineWidth = 1;
           if (obs.points && obs.points.length > 0) {
-            for (let i = 0; i < 3; i++) {
-              const p = obs.points[i * 2 % obs.points.length];
+            for (let i = 0; i < 2; i++) {
+              const p = obs.points[i * 3 % obs.points.length];
               ctx.beginPath();
-              ctx.arc(p.x * 0.5, p.y * 0.5, obs.width * 0.1, 0, Math.PI * 2);
+              ctx.arc(p.x * 0.4, p.y * 0.4, obs.width * 0.08, 0, Math.PI * 2);
               ctx.stroke();
             }
           }
@@ -613,12 +781,32 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
         let shipScale = laneWidth / 100;
         if (powerUpActiveRef.current?.type === 'shrink') shipScale *= 0.5;
         
-        const collisionRadius = 38 * shipScale; 
-        const nearMissRadius = 65 * shipScale; 
+        // Refined Collision Physics: Multi-point check for more precision
+        const collisionRadius = 32 * shipScale; // Slightly smaller base radius for precision
+        const nearMissRadius = 60 * shipScale; 
         
-        // Even more generous collision for power-ups
-        const powerUpRadius = 50 * (laneWidth / 100);
-        
+        // Precise collision points for the ship (nose, wings, tail)
+        const shipPoints = [
+          { x: playerX, y: playerY - 25 * shipScale }, // Nose
+          { x: playerX - 20 * shipScale, y: playerY + 15 * shipScale }, // Left Wing
+          { x: playerX + 20 * shipScale, y: playerY + 15 * shipScale }, // Right Wing
+          { x: playerX, y: playerY + 20 * shipScale } // Tail
+        ];
+
+        const checkPreciseCollision = (obs: any) => {
+          // Circular check first for performance
+          if (dist > (obs.width / 2 + 40 * shipScale)) return false;
+
+          // Check if any ship point is inside the obstacle's radius or polygon
+          for (const p of shipPoints) {
+            const pdx = p.x - (obs.x + obs.width / 2);
+            const pdy = p.y - (obs.y + obs.height / 2);
+            const pdist = Math.sqrt(pdx * pdx + pdy * pdy);
+            if (pdist < obs.width * 0.45) return true;
+          }
+          return false;
+        };
+
         // Near Miss Detection
         if (obs.type !== 'powerup' && !obs.hasNearMissed && dist < nearMissRadius && dist > collisionRadius) {
           obs.hasNearMissed = true;
@@ -646,7 +834,7 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
           }
         }
 
-        const isColliding = obs.type === 'powerup' ? dist < powerUpRadius : dist < collisionRadius;
+        const isColliding = obs.type === 'powerup' ? dist < 50 * (laneWidth / 100) : checkPreciseCollision(obs);
 
         if (isColliding) {
           if (obs.type === 'powerup') {
@@ -700,11 +888,18 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
             if (powerUpActiveRef.current?.type === 'shield') {
               powerUpActiveRef.current = null;
               onPowerUpChange(null);
-              shakeRef.current = 15;
+              shakeRef.current = 25;
+              
+              // Knockback physics: Push player slightly away from collision
+              const pushX = (dx / dist) * 0.1;
+              const pushY = (dy / dist) * 0.1;
+              // We can't directly set playerPos here as it's a prop, 
+              // but we can trigger a shake and a visual glitch
+              
               floatingTextsRef.current.push({
                 x: playerX, y: playerY - 50,
-                text: 'SHIELD BROKEN',
-                life: 1, color: '#ff00ff'
+                text: 'SHIELD DEPLETED',
+                life: 1.2, color: '#ff00ff'
               });
               return false;
             }
@@ -850,7 +1045,7 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
     return () => {
       cancelAnimationFrame(frameRef.current);
     };
-  }, [isStarted, isGameOver, isPaused, isInvincible, onGameOver, onScoreUpdate, laneWidth]);
+  }, [isStarted, isGameOver, isPaused, isInvincible, onGameOver, onScoreUpdate, onPowerUpChange, laneWidth]);
 
   return (
     <canvas
