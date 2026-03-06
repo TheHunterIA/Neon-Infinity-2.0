@@ -26,6 +26,13 @@ export default function App() {
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [isTiltEnabled, setIsTiltEnabled] = useState(false);
 
+  // Stable refs for values used in callbacks to prevent game loop restarts
+  const usernameRef = useRef(username);
+  const highScoreRef = useRef(highScore);
+
+  useEffect(() => { usernameRef.current = username; }, [username]);
+  useEffect(() => { highScoreRef.current = highScore; }, [highScore]);
+
   useEffect(() => {
     if (activePowerUp) {
       const interval = setInterval(() => setTick(t => t + 1), 100);
@@ -38,13 +45,17 @@ export default function App() {
       setHighScore(score);
       localStorage.setItem('neon-dash-highscore', score.toString());
     }
-  }, [score, highScore]);
+  }, [score]); // Removed highScore from dependency to prevent constant handleGameOver recreation
 
   const isGameOverRef = useRef(false);
 
   const handleGameOver = React.useCallback(async (finalScore: number) => {
     if (isGameOverRef.current) return;
     isGameOverRef.current = true;
+    
+    const currentUsername = usernameRef.current;
+    const currentHighScore = highScoreRef.current;
+
     setIsGameOver(true);
     setLastFinalScore(finalScore);
     
@@ -59,33 +70,19 @@ export default function App() {
       "Nice try, rookie.", "Is that all?", "The void is hungry.",
       "Rebooting systems...", "Try using your eyes next time.",
       "Almost had it. Almost.", "My grandma drives faster than this.",
-      "Was that a dash or a crawl?", "You hit that on purpose, right?",
-      "Maybe stick to Pong?", "Error 404: Skill not found.",
-      "The ship is fine, the pilot... not so much.", "Are you playing with your feet?",
-      "That was painful to watch.", "Did you blink? You missed everything.",
-      "A potato could have dodged that.", "Is your gyroscope broken or just your hands?",
-      "You're making the asteroids look good.", "Don't quit your day job, pilot.",
-      "That's one way to end a career.", "Ouch. That had to hurt.",
-      "Is the screen even on?", "You're a natural... at crashing.",
-      "Asteroid 1 - Pilot 0.", "Try turning the device the other way.",
-      "Was that a speedrun of losing?", "Impressive...ly bad.",
-      "You're the reason we have insurance.", "The asteroids are laughing at you.",
-      "Zero stars. Would not recommend this pilot.", "You call that steering?",
-      "The void expected more. Much more.", "Even the AI is embarrassed for you.",
-      "Minha avó dirige mais rápido que isso.", "Isso foi um dash ou um passeio no parque?",
-      "Você bateu naquele asteroide de propósito, né?", "Talvez seja melhor jogar paciência?",
-      "Erro 404: Habilidade não encontrada.", "A nave está bem, o piloto... nem tanto.",
-      "Você está jogando com os pés?", "Foi doloroso de assistir.",
-      "Você piscou? Porque perdeu tudo.", "Uma batata teria desviado disso.",
-      "Seu giroscópio quebrou ou foram suas mãos?", "Você está fazendo os asteroides parecerem bons.",
-      "Não peça demissão do seu emprego, piloto.", "Essa é uma forma de encerrar a carreira.",
-      "Ai. Essa deve ter doído.", "A tela está ligada?",
-      "Você é um talento natural... para bater.", "Asteroide 1 - Piloto 0.",
-      "Tente virar o aparelho para o outro lado.", "Isso foi um speedrun de como perder?",
-      "Impressionante... de tão ruim.", "Você é o motivo de termos seguro.",
-      "Os asteroides estão rindo de você.", "Zero estrelas. Não recomendo este piloto.",
-      "Você chama isso de pilotar?", "O vazio esperava mais. Muito mais.",
-      "Até a IA está com vergonha de você."
+      "Was that a dash or a crawl?", "Você bateu naquele asteroide de propósito, né?",
+      "Talvez seja melhor jogar paciência?", "Erro 404: Habilidade não encontrada.",
+      "A nave está bem, o piloto... nem tanto.", "Você está jogando com os pés?",
+      "Foi doloroso de assistir.", "Você piscou? Porque perdeu tudo.",
+      "Uma batata teria desviado disso.", "Seu giroscópio quebrou ou foram suas mãos?",
+      "Você está fazendo os asteroides parecerem bons.", "Não peça demissão do seu emprego, piloto.",
+      "Essa é uma forma de encerrar a carreira.", "Ai. Essa deve ter doído.",
+      "A tela está ligada?", "Você é um talento natural... para bater.",
+      "Asteroide 1 - Piloto 0.", "Tente virar o aparelho para o outro lado.",
+      "Isso foi um speedrun de como perder?", "Impressionante... de tão ruim.",
+      "Você é o motivo de termos seguro.", "Os asteroides estão rindo de você.",
+      "Zero estrelas. Não recomendo este piloto.", "Você chama isso de pilotar?",
+      "O vazio esperava mais. Muito mais.", "Até a IA está com vergonha de você."
     ];
     const highMessages = [
       "LEGENDARY RUN!", "NEW PROTOCOL ESTABLISHED", "GODLIKE PRECISION",
@@ -93,12 +90,11 @@ export default function App() {
       "CHAMPION OF THE NEON", "DATA STREAM OPTIMIZED"
     ];
 
-    if (finalScore > highScore) {
+    if (finalScore > currentHighScore) {
       setGameOverMessage(highMessages[Math.floor(Math.random() * highMessages.length)]);
     } else if (finalScore < 500) {
       setGameOverMessage(funMessages[Math.floor(Math.random() * funMessages.length)]);
     } else {
-      // 30% chance to still get mocked if you didn't beat high score
       if (Math.random() < 0.3) {
         setGameOverMessage(funMessages[Math.floor(Math.random() * funMessages.length)]);
       } else {
@@ -106,7 +102,7 @@ export default function App() {
       }
     }
 
-    // Instant-ish restart after 2.5 seconds (independent of Supabase)
+    // Instant-ish restart after 2.5 seconds
     setTimeout(() => {
       isGameOverRef.current = false;
       setIsStarted(true);
@@ -116,25 +112,49 @@ export default function App() {
       setPlayerPos({ x: 0.5, y: 0.8, vx: 0, vy: 0 });
     }, 2500);
 
-    if (username && finalScore > 0) {
-      console.log(`Attempting to save score: ${finalScore} for ${username}`);
+    // Score saving logic
+    if (currentUsername && finalScore > 0) {
+      console.log(`[Supabase] Attempting to save score: ${finalScore} for ${currentUsername}`);
       const supabase = getSupabase();
       
       if (!supabase) {
-        console.warn('Supabase not configured, score not saved to cloud.');
+        console.warn('[Supabase] Not configured, score not saved.');
         return;
       }
 
       try {
-        const { error: insertError } = await supabase
+        // First, check if user already has a higher score in the DB
+        const { data: currentEntry, error: fetchError } = await supabase
           .from('leaderboard')
-          .insert([{ username, score: finalScore }]);
+          .select('score')
+          .eq('username', currentUsername)
+          .maybeSingle();
+
+        if (fetchError) {
+          console.error('[Supabase] Fetch error:', fetchError.message);
+        }
+
+        const existingScore = currentEntry?.score || 0;
+
+        if (finalScore > existingScore) {
+          console.log(`[Supabase] New high score! ${finalScore} > ${existingScore}. Saving...`);
+          const { error: upsertError } = await supabase
+            .from('leaderboard')
+            .upsert(
+              { username: currentUsername, score: finalScore },
+              { onConflict: 'username' }
+            );
+          
+          if (upsertError) {
+            console.error('[Supabase] Upsert error:', upsertError.message);
+            throw upsertError;
+          }
+          console.log('[Supabase] Score updated successfully');
+        } else {
+          console.log(`[Supabase] Score ${finalScore} is not higher than existing ${existingScore}. Not updating.`);
+        }
         
-        if (insertError) throw insertError;
-        
-        console.log('Score saved successfully');
-        
-        // Fetch leaderboard to find next competitor
+        // Fetch leaderboard to find next competitor (always do this to update current ranking)
         const { data: lbData, error: lbError } = await supabase
           .from('leaderboard')
           .select('*')
@@ -144,7 +164,7 @@ export default function App() {
         if (lbError) throw lbError;
 
         if (lbData) {
-          const myRankIndex = lbData.findIndex((s: any) => s.username === username && s.score === finalScore);
+          const myRankIndex = lbData.findIndex((s: any) => s.username === currentUsername && s.score === finalScore);
           if (myRankIndex > 0) {
             setNextCompetitor(lbData[myRankIndex - 1]);
           } else {
@@ -152,10 +172,10 @@ export default function App() {
           }
         }
       } catch (err) {
-        console.error('Failed to save score', err);
+        console.error('[Supabase] Failed to save score:', err);
       }
     }
-  }, [username, highScore]);
+  }, []); // Empty dependency array thanks to Refs
 
   const handleScoreUpdate = React.useCallback((newScore: number) => {
     setScore(newScore);
