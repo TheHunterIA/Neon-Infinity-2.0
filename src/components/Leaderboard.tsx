@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LeaderboardEntry } from '../types';
 import { Trophy } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { getSupabase } from '../lib/supabase';
 
 export const Leaderboard: React.FC = () => {
   const [scores, setScores] = useState<LeaderboardEntry[]>([]);
@@ -10,6 +10,14 @@ export const Leaderboard: React.FC = () => {
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
+      const supabase = getSupabase();
+      
+      if (!supabase) {
+        setError('DATABASE OFFLINE: Supabase environment variables are not configured.');
+        setLoading(false);
+        return;
+      }
+
       try {
         const { data, error: fetchError } = await supabase
           .from('leaderboard')

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Game } from './components/Game';
 import { Leaderboard } from './components/Leaderboard';
 import { Play, RotateCcw, Trophy, Share2, Github, Zap, Pause } from 'lucide-react';
-import { supabase } from './lib/supabase';
+import { getSupabase } from './lib/supabase';
 
 export default function App() {
   const [isStarted, setIsStarted] = useState(false);
@@ -104,6 +104,13 @@ export default function App() {
 
     if (username && finalScore > 0) {
       console.log(`Attempting to save score: ${finalScore} for ${username}`);
+      const supabase = getSupabase();
+      
+      if (!supabase) {
+        console.warn('Supabase not configured, score not saved to cloud.');
+        return;
+      }
+
       try {
         const { error: insertError } = await supabase
           .from('leaderboard')
