@@ -298,8 +298,8 @@ export default function App() {
   const handleRevive = async () => {
     if (hasRevived || isAdLoading) return;
     
-    if (isOffline && !isNative()) {
-      alert('Vídeo indisponível offline');
+    if (isOffline) {
+      alert('Vídeo indisponível offline. Conecte-se para reviver.');
       return;
     }
 
@@ -630,16 +630,16 @@ export default function App() {
                 {!hasRevived && (
                   <button
                     onClick={handleRevive}
-                    disabled={isOffline && !isNative()}
+                    disabled={isOffline}
                     className={`group relative flex items-center justify-center gap-3 py-3 px-8 rounded-full border-2 transition-all transform hover:scale-105 active:scale-95 ${
-                      isOffline && !isNative()
+                      isOffline
                         ? 'border-white/10 text-white/20 cursor-not-allowed'
                         : 'border-neon-magenta text-white hover:bg-neon-magenta/20 shadow-[0_0_15px_rgba(255,0,255,0.3)]'
                     }`}
                   >
-                    <Play fill="currentColor" size={18} className="text-neon-magenta" />
+                    <Play fill="currentColor" size={18} className={isOffline ? 'text-white/10' : 'text-neon-magenta'} />
                     <span className="uppercase tracking-widest font-bold text-sm">
-                      {isOffline && !isNative() ? 'Vídeo indisponível offline' : 'REVIVER (VÍDEO)'}
+                      {isOffline ? 'Vídeo indisponível offline' : 'REVIVER (VÍDEO)'}
                     </span>
                     {!isOffline && <div className="absolute -inset-1 bg-neon-magenta opacity-20 blur-md group-hover:opacity-40 transition-opacity" />}
                   </button>

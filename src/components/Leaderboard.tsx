@@ -12,6 +12,7 @@ export const Leaderboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [isCached, setIsCached] = useState(false);
 
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
@@ -28,6 +29,7 @@ export const Leaderboard: React.FC = () => {
     const fetchLeaderboard = async () => {
       setLoading(true);
       setError(null);
+      setIsCached(false);
       const supabase = getSupabase();
       const currentUsername = localStorage.getItem('neon-dash-username');
       
@@ -35,6 +37,7 @@ export const Leaderboard: React.FC = () => {
         const cachedData = getCachedLeaderboard();
         if (cachedData.length > 0) {
           setScores(cachedData.slice(0, 20));
+          setIsCached(true);
           if (currentUsername) {
             const index = cachedData.findIndex(s => s.username === currentUsername);
             if (index !== -1) {
@@ -137,6 +140,7 @@ export const Leaderboard: React.FC = () => {
           <Trophy className="text-neon-yellow w-6 h-6 sm:w-8 sm:h-8" />
           <h2 className="text-xl sm:text-2xl font-bold text-neon-cyan uppercase tracking-widest">Top Dashers</h2>
           {isOffline && <WifiOff size={16} className="text-neon-magenta animate-pulse" />}
+          {isCached && <span className="text-[8px] text-neon-magenta uppercase font-mono tracking-widest ml-1">(Cached)</span>}
         </div>
         <button 
           onClick={() => setTick(t => t + 1)}

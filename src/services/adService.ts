@@ -21,6 +21,13 @@ export const initializeAdMob = async () => {
 };
 
 export const showRewardedAd = async (onReward: () => void, onFail: () => void) => {
+  // Check for internet connection
+  if (!navigator.onLine) {
+    console.warn('Offline: Cannot show ads');
+    onFail();
+    return;
+  }
+
   if (isNative()) {
     try {
       // 1. Prepare the ad
