@@ -5,7 +5,7 @@ import { Leaderboard } from './components/Leaderboard';
 import { AdMob } from '@capacitor-community/admob';
 import { Play, RotateCcw, Trophy, Share2, Github, Zap, Pause, Loader2 } from 'lucide-react';
 import { getSupabase } from './lib/supabase';
-import { initializeAdMob, showRewardedAd, isNative } from './services/adService';
+import { exibirVideoRecompensa } from './services/adMobService';
 import { syncPendingScores, saveScoreLocally } from './services/scoreService';
 import { InstallBanner } from './components/InstallBanner';
 import { WifiOff } from 'lucide-react';
@@ -46,8 +46,6 @@ export default function App() {
   };
 
   useEffect(() => {
-    initializeAdMob();
-    
     // Show offline message at initial reboot
     triggerOfflineBanner();
     
@@ -307,27 +305,31 @@ export default function App() {
     
     setIsAdLoading(true);
 
-    const performRevive = () => {
-      setIsAdLoading(false);
-      setHasRevived(true);
-      setHealth(100);
-      setIsGameOver(false);
-      isGameOverRef.current = false;
-      setIsInvincible(true);
+    try {
+      const result = await exibirVideoRecompensa();
       
-      // 3 seconds of invincibility
-      setTimeout(() => {
-        setIsInvincible(false);
-      }, 3000);
-    };
-
-    const handleFail = () => {
       setIsAdLoading(false);
-      alert('Falha ao carregar vídeo. Tente novamente.');
-    };
 
-    // Use centralized ad service
-    await showRewardedAd(performRevive, handleFail);
+      if (result) {
+        setHasRevived(true);
+        setHealth(100);
+        setIsGameOver(false);
+        isGameOverRef.current = false;
+        setIsInvincible(true);
+        
+        // 3 segundos de invincibilidade
+        setTimeout(() => {
+          setIsInvincible(false);
+        }, 3000);
+      } else {
+        // O usuário não assistiu até o final ou houve erro
+        console.log('Revive cancelado ou falhou');
+      }
+    } catch (error) {
+      setIsAdLoading(false);
+      console.error('Erro no revive:', error);
+      alert('Falha ao processar anúncio. Tente novamente.');
+    }
   };
 
   const togglePause = React.useCallback(() => {
