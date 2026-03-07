@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Game } from './components/Game';
 import { Leaderboard } from './components/Leaderboard';
 import { AdMob } from '@capacitor-community/admob';
-import { Play, RotateCcw, Trophy, Share2, Github, Zap, Pause, Loader2 } from 'lucide-react';
+import { Play, RotateCcw, Trophy, Share2, Github, Zap, Pause, Loader2, Settings, Copy, Check, Key } from 'lucide-react';
 import { getSupabase } from './lib/supabase';
 import { exibirVideoRecompensa } from './services/adMobService';
 import { syncPendingScores, saveScoreLocally } from './services/scoreService';
@@ -30,7 +30,20 @@ export default function App() {
     return saved ? parseInt(saved) : 0;
   });
   const [username, setUsername] = useState(() => localStorage.getItem('neon-dash-username') || '');
+  const [playerId, setPlayerId] = useState(() => {
+    let id = localStorage.getItem('neon-dash-player-id');
+    if (!id) {
+      id = crypto.randomUUID?.() || Math.random().toString(36).substring(2) + Date.now().toString(36);
+      localStorage.setItem('neon-dash-player-id', id);
+    }
+    return id;
+  });
   const [tempUsername, setTempUsername] = useState(username);
+  const [isCheckingName, setIsCheckingName] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [importId, setImportId] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [activePowerUp, setActivePowerUp] = useState<{ type: string, end: number } | null>(null);
   const [tick, setTick] = useState(0);
@@ -98,6 +111,7 @@ export default function App() {
     isGameOverRef.current = true;
     
     const currentUsername = usernameRef.current;
+    const currentPlayerId = localStorage.getItem('neon-dash-player-id') || '';
     const currentHighScore = highScoreRef.current;
 
     setIsGameOver(true);
@@ -177,7 +191,7 @@ export default function App() {
       console.log(`[Leaderboard] Processing score for ${currentUsername}: ${finalScore}`);
       
       // Always save locally first
-      saveScoreLocally(finalScore, currentUsername);
+      saveScoreLocally(finalScore, currentUsername, currentPlayerId);
 
       const supabase = getSupabase();
       
@@ -193,12 +207,19 @@ export default function App() {
         // 1. Fetch current best score from DB
         const { data: currentEntry, error: fetchError } = await supabase
           .from('leaderboard')
-          .select('score')
+          .select('score, player_id')
           .eq('username', currentUsername)
           .maybeSingle();
 
         if (fetchError) {
           console.error('[Leaderboard] Error fetching existing score:', fetchError.message);
+        }
+
+        // If name is taken by someone else, we shouldn't update it
+        // But startGame should have prevented this. This is a double check.
+        if (currentEntry && currentEntry.player_id && currentEntry.player_id !== currentPlayerId) {
+          console.error('[Leaderboard] Name taken by another player. Score not updated.');
+          return;
         }
 
         const existingScore = currentEntry?.score || 0;
@@ -209,7 +230,7 @@ export default function App() {
           const { error: upsertError } = await supabase
             .from('leaderboard')
             .upsert(
-              { username: currentUsername, score: finalScore },
+              { username: currentUsername, score: finalScore, player_id: currentPlayerId },
               { onConflict: 'username' }
             );
           
@@ -267,13 +288,96 @@ export default function App() {
     setScore(newScore);
   }, []);
 
-  const startGame = () => {
+  const handleImportId = async () => {
+    if (!importId.trim()) return;
+    
+    setIsImporting(true);
+    const supabase = getSupabase();
+    if (supabase && navigator.onLine) {
+      try {
+        const { data, error } = await supabase
+          .from('leaderboard')
+          .select('username, score')
+          .eq('player_id', importId.trim())
+          .maybeSingle();
+        
+        if (error) {
+          alert('Erro ao verificar ID. Tente novamente.');
+        } else if (data) {
+          setPlayerId(importId.trim());
+          localStorage.setItem('neon-dash-player-id', importId.trim());
+          setUsername(data.username);
+          localStorage.setItem('neon-dash-username', data.username);
+          setHighScore(data.score);
+          localStorage.setItem('neon-dash-highscore', data.score.toString());
+          setTempUsername(data.username);
+          alert(`Piloto ${data.username} importado com sucesso!`);
+          setShowSettings(false);
+          setImportId('');
+        } else {
+          alert('ID não encontrado no banco de dados.');
+        }
+      } catch (err) {
+        console.error('Import failed:', err);
+        alert('Falha na conexão.');
+      }
+    } else {
+      alert('Conecte-se à internet para importar um perfil.');
+    }
+    setIsImporting(false);
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(playerId);
+    setCopySuccess(true);
+    setTimeout(() => setCopySuccess(false), 2000);
+  };
+
+  const startGame = async () => {
     if (!tempUsername.trim()) {
       alert('Please enter a pilot name');
       return;
     }
     
     const finalName = tempUsername.trim();
+    
+    // Individualization: Check if name is taken
+    setIsCheckingName(true);
+    const supabase = getSupabase();
+    if (supabase && navigator.onLine) {
+      try {
+        const { data, error } = await supabase
+          .from('leaderboard')
+          .select('player_id, score')
+          .eq('username', finalName)
+          .maybeSingle();
+        
+        if (error) {
+          console.error('Error checking name availability:', error);
+        } else if (data && data.player_id && data.player_id !== playerId) {
+          alert('Este nome já está sendo usado por outro piloto. Por favor, escolha outro.');
+          setIsCheckingName(false);
+          return;
+        } else {
+          // Claim the name immediately if it's new or belongs to us
+          // This ensures the player_id is linked even before the first game ends
+          const { error: claimError } = await supabase
+            .from('leaderboard')
+            .upsert(
+              { username: finalName, player_id: playerId, score: data?.score || 0 },
+              { onConflict: 'username' }
+            );
+          
+          if (claimError) {
+            console.error('Error claiming name:', claimError);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to verify name:', err);
+      }
+    }
+    setIsCheckingName(false);
+
     setUsername(finalName);
     localStorage.setItem('neon-dash-username', finalName);
     
@@ -465,21 +569,19 @@ export default function App() {
 
   return (
     <div className="relative min-h-screen bg-black text-white selection:bg-neon-cyan selection:text-black overflow-hidden">
-      {/* Background Grid Effect */}
-      <div className="fixed inset-0 opacity-20 pointer-events-none" 
-           style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, #00f3ff 1px, transparent 0)', backgroundSize: '40px 40px' }} />
-
-      <Game 
-        key={gameId}
-        isStarted={isStarted} 
-        isGameOver={isGameOver} 
-        isPaused={isPaused}
-        isInvincible={isInvincible}
-        playerPos={playerPos}
-        onGameOver={handleGameOver}
-        onScoreUpdate={handleScoreUpdate}
-        onPowerUpChange={setActivePowerUp}
-      />
+      <div className="fixed inset-0 pointer-events-auto">
+        <Game 
+          key={gameId}
+          isStarted={isStarted} 
+          isGameOver={isGameOver} 
+          isPaused={isPaused}
+          isInvincible={isInvincible}
+          playerPos={playerPos}
+          onGameOver={handleGameOver}
+          onScoreUpdate={handleScoreUpdate}
+          onPowerUpChange={setActivePowerUp}
+        />
+      </div>
 
       {/* Offline Indicator */}
       <AnimatePresence>
@@ -598,12 +700,23 @@ export default function App() {
               
               <button 
                 onClick={startGame}
-                className="group relative flex items-center justify-center gap-3 bg-neon-cyan text-black font-bold py-4 px-8 rounded-full hover:bg-white transition-all duration-300 transform hover:scale-105 active:scale-95"
+                disabled={isCheckingName}
+                className="group relative flex items-center justify-center gap-3 bg-neon-cyan text-black font-bold py-4 px-8 rounded-full hover:bg-white transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-wait"
               >
-                <Play fill="currentColor" size={24} />
-                <span className="text-xl uppercase tracking-tighter">Initiate Dash</span>
+                {isCheckingName ? (
+                  <Loader2 size={24} className="animate-spin" />
+                ) : (
+                  <Play fill="currentColor" size={24} />
+                )}
+                <span className="text-xl uppercase tracking-tighter">
+                  {isCheckingName ? 'Verifying...' : 'Initiate Dash'}
+                </span>
                 <div className="absolute -inset-1 bg-neon-cyan opacity-30 blur-lg group-hover:opacity-60 transition-opacity" />
               </button>
+
+              <p className="text-[8px] text-white/20 uppercase tracking-widest text-center mt-2">
+                * Pilot names are unique and linked to your device
+              </p>
 
               <button 
                 onClick={() => setShowLeaderboard(true)}
@@ -611,6 +724,14 @@ export default function App() {
               >
                 <Trophy size={20} className="text-neon-yellow" />
                 <span className="uppercase tracking-widest text-xs">Leaderboard</span>
+              </button>
+
+              <button 
+                onClick={() => setShowSettings(true)}
+                className="flex items-center justify-center gap-3 bg-transparent border border-white/20 hover:border-neon-cyan text-white font-medium py-3 px-8 rounded-full transition-all"
+              >
+                <Settings size={20} className="text-neon-cyan" />
+                <span className="uppercase tracking-widest text-xs">Pilot Profile</span>
               </button>
             </div>
 
@@ -708,6 +829,84 @@ export default function App() {
             <p className="text-neon-cyan/60 font-mono text-[10px] uppercase tracking-widest">
               Sincronizando com a rede neural
             </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Settings / Profile Modal */}
+      <AnimatePresence>
+        {showSettings && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 flex items-center justify-center z-[110] bg-black/90 backdrop-blur-xl p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="w-full max-w-md bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8"
+            >
+              <div className="flex justify-between items-center mb-8">
+                <h2 className="text-2xl font-black text-neon-cyan uppercase tracking-tighter italic">Pilot Profile</h2>
+                <button 
+                  onClick={() => setShowSettings(false)}
+                  className="text-white/40 hover:text-white transition-colors uppercase text-[10px] tracking-widest"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="space-y-8">
+                {/* Export Section */}
+                <div>
+                  <label className="block text-[10px] uppercase tracking-[0.3em] text-white/40 mb-3 font-mono">Your Access Key</label>
+                  <div className="relative group">
+                    <div className="bg-black/40 border border-white/10 rounded-xl p-4 font-mono text-[10px] sm:text-xs text-neon-cyan break-all pr-12">
+                      {playerId}
+                    </div>
+                    <button 
+                      onClick={copyToClipboard}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-white/40 hover:text-neon-cyan transition-colors"
+                      title="Copy to clipboard"
+                    >
+                      {copySuccess ? <Check size={18} className="text-neon-lime" /> : <Copy size={18} />}
+                    </button>
+                  </div>
+                  <p className="mt-3 text-[9px] text-white/30 leading-relaxed uppercase tracking-wider">
+                    Use this key to access your profile and scores on other devices. Keep it secret!
+                  </p>
+                </div>
+
+                <div className="h-px bg-white/10" />
+
+                {/* Import Section */}
+                <div>
+                  <label className="block text-[10px] uppercase tracking-[0.3em] text-white/40 mb-3 font-mono">Import Profile</label>
+                  <div className="flex flex-col gap-3">
+                    <div className="relative">
+                      <Key size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" />
+                      <input 
+                        type="text"
+                        placeholder="PASTE ACCESS KEY HERE"
+                        value={importId}
+                        onChange={(e) => setImportId(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-xs font-mono text-white focus:outline-none focus:border-neon-magenta transition-colors uppercase"
+                      />
+                    </div>
+                    <button 
+                      onClick={handleImportId}
+                      disabled={isImporting || !importId.trim()}
+                      className="w-full bg-neon-magenta text-white font-bold py-3 rounded-xl hover:bg-white hover:text-black transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {isImporting ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
+                      <span className="uppercase tracking-widest text-xs">Sync Profile</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

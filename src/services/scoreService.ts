@@ -6,12 +6,13 @@ const LEADERBOARD_CACHE_KEY = 'neon_dash_leaderboard_cache';
 export interface ScoreEntry {
   username: string;
   score: number;
+  player_id: string;
   created_at?: string;
 }
 
-export const saveScoreLocally = (score: number, username: string) => {
+export const saveScoreLocally = (score: number, username: string, player_id: string) => {
   const pendingScores = getPendingScores();
-  pendingScores.push({ username, score, created_at: new Date().toISOString() });
+  pendingScores.push({ username, score, player_id, created_at: new Date().toISOString() });
   localStorage.setItem(PENDING_SCORES_KEY, JSON.stringify(pendingScores));
 };
 
@@ -34,7 +35,14 @@ export const syncPendingScores = async () => {
   try {
     const { error } = await supabase
       .from('leaderboard')
-      .insert(pendingScores.map(s => ({ username: s.username, score: s.score })));
+      .upsert(
+        pendingScores.map(s => ({ 
+          username: s.username, 
+          score: s.score, 
+          player_id: s.player_id 
+        })),
+        { onConflict: 'username' }
+      );
 
     if (!error) {
       clearPendingScores();

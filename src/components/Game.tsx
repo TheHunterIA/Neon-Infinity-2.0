@@ -27,7 +27,6 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
   const frameRef = useRef<number>(0);
   const lastObstacleTime = useRef<number>(0);
   const shakeRef = useRef(0);
-  const offsetRef = useRef(0);
   const starsRef = useRef<{ x: number, y: number, size: number, speed: number, opacity: number }[]>([]);
   
   // New Addictive Mechanics
@@ -90,7 +89,6 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
       powerUpActiveRef.current = null;
       lastObstacleTime.current = performance.now();
       shakeRef.current = 0;
-      offsetRef.current = 0;
 
       // Initialize Stars
       const numStars = 150;
@@ -104,44 +102,6 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
       
       isInitializedRef.current = true;
     }
-
-    const drawGrid = (ctx: CanvasRenderingContext2D, width: number, height: number, offset: number) => {
-      ctx.save();
-      
-      // Pulse grid to "beat"
-      const pulse = Math.sin(Date.now() * 0.01) * 0.1 + 0.2;
-      ctx.strokeStyle = powerUpActiveRef.current ? '#ff00ff' : '#00f3ff';
-      ctx.lineWidth = 1;
-      ctx.globalAlpha = pulse;
-
-      const horizon = height * 0.4;
-      
-      // Vertical Perspective Lines
-      for (let i = -3; i <= 3; i++) {
-        const xTop = width / 2 + i * (laneWidth * 0.4);
-        const xBottom = width / 2 + i * (laneWidth * 5);
-        ctx.beginPath();
-        ctx.moveTo(xTop, horizon);
-        ctx.lineTo(xBottom, height);
-        ctx.stroke();
-      }
-
-      // Horizontal Scrolling Lines
-      const lineSpacing = 60;
-      const numLines = 25;
-      for (let i = 0; i < numLines; i++) {
-        const yPos = horizon + ((i * lineSpacing + offset) % (height - horizon));
-        const progress = (yPos - horizon) / (height - horizon);
-        const gridLineWidth = laneWidth * 10 * progress;
-        
-        ctx.globalAlpha = (0.05 + (progress * 0.3)) * (pulse * 2);
-        ctx.beginPath();
-        ctx.moveTo(width / 2 - gridLineWidth / 2, yPos);
-        ctx.lineTo(width / 2 + gridLineWidth / 2, yPos);
-        ctx.stroke();
-      }
-      ctx.restore();
-    };
 
     const drawShip = (ctx: CanvasRenderingContext2D, x: number, y: number, themeColor: string, time: number, score: number) => {
       ctx.save();
@@ -233,13 +193,15 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
       ctx.fillStyle = '#050505';
       ctx.strokeStyle = themeColor;
 
-      // Helper for complex polygons
+      // Helper for clean 2D polygons
       const drawPoly = (points: {x: number, y: number}[]) => {
+        ctx.fillStyle = '#0a0a0a';
         ctx.beginPath();
         ctx.moveTo(points[0].x, points[0].y);
         for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
         ctx.closePath();
-        ctx.fill(); ctx.stroke();
+        ctx.fill(); 
+        ctx.stroke();
       };
 
       if (level === 0) {
@@ -510,9 +472,56 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
         shakeRef.current *= Math.pow(0.9, dt);
       }
 
+      const playerX = (playerPosRef.current.x * canvas.width) + shakeX;
+      const playerY = (playerPosRef.current.y * canvas.height) + shakeY;
+
+      // Theme Color Calculation
+      let themeColor = '#00f3ff';
+      if (powerUpActiveRef.current?.type === 'multiplier') themeColor = '#fff01f';
+      if (powerUpActiveRef.current?.type === 'ghost') themeColor = '#bf00ff';
+      if (powerUpActiveRef.current?.type === 'slowmo') themeColor = '#0070ff';
+      if (powerUpActiveRef.current?.type === 'magnet') themeColor = '#00ff88';
+      if (powerUpActiveRef.current?.type === 'shrink') themeColor = '#00ffcc';
+      if (powerUpActiveRef.current?.type === 'turbo') themeColor = '#ff8800';
+
       // Background - Absolute Black
       ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Perspective Lines (Lower Half)
+      const horizonY = canvas.height * 0.5;
+      const vanishingPointX = canvas.width * 0.5;
+      const lineSpeed = effectiveSpeed * 0.5; // Sync with game speed
+      const lineSpacing = 60;
+      const offset = (time * 0.1 * lineSpeed) % lineSpacing;
+
+      ctx.save();
+      ctx.strokeStyle = themeColor; // Use theme color for integration
+      ctx.lineWidth = 1;
+
+      // Horizontal lines (moving towards player)
+      for (let y = horizonY; y <= canvas.height; y += 15) {
+        const progress = (y - horizonY) / (canvas.height - horizonY);
+        const movingY = horizonY + ((Math.pow(progress, 1.5) * (canvas.height - horizonY) + offset) % (canvas.height - horizonY));
+        
+        ctx.globalAlpha = progress * 0.15; // Subtle fade
+        ctx.beginPath();
+        ctx.moveTo(0, movingY);
+        ctx.lineTo(canvas.width, movingY);
+        ctx.stroke();
+      }
+
+      // Vertical lines (converging at vanishing point)
+      const numVerticalLines = 10;
+      for (let i = 0; i <= numVerticalLines; i++) {
+        const xAtBottom = (canvas.width / numVerticalLines) * i;
+        ctx.globalAlpha = 0.1;
+        ctx.beginPath();
+        ctx.moveTo(vanishingPointX, horizonY);
+        ctx.lineTo(xAtBottom, canvas.height);
+        ctx.stroke();
+      }
+      ctx.restore();
 
       // Draw Stars
       ctx.save();
@@ -530,12 +539,6 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
       });
       ctx.restore();
 
-      offsetRef.current = (offsetRef.current + effectiveSpeed) % 60;
-      drawGrid(ctx, canvas.width, canvas.height, offsetRef.current);
-
-      const playerX = (playerPosRef.current.x * canvas.width) + shakeX;
-      const playerY = (playerPosRef.current.y * canvas.height) + shakeY;
-
       // Ship Evolution Check
       const currentLevel = Math.min(10, Math.floor(scoreRef.current / 2000));
       if (currentLevel > lastLevelRef.current) {
@@ -548,14 +551,6 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
         });
         shakeRef.current = 25;
       }
-
-      let themeColor = '#00f3ff';
-      if (powerUpActiveRef.current?.type === 'multiplier') themeColor = '#fff01f';
-      if (powerUpActiveRef.current?.type === 'ghost') themeColor = '#bf00ff';
-      if (powerUpActiveRef.current?.type === 'slowmo') themeColor = '#0070ff';
-      if (powerUpActiveRef.current?.type === 'magnet') themeColor = '#00ff88';
-      if (powerUpActiveRef.current?.type === 'shrink') themeColor = '#00ffcc';
-      if (powerUpActiveRef.current?.type === 'turbo') themeColor = '#ff8800';
 
       drawShip(ctx, playerX, playerY, themeColor, time, scoreRef.current);
 
@@ -708,13 +703,18 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
           ctx.fill();
           ctx.globalAlpha = 1;
         } else {
-          // Asteroid Obstacle: Simple Neon Design
-          ctx.translate(obs.x + obs.width / 2, obs.y + obs.height / 2);
+          // Asteroid Obstacle: Clean 2D Design
+          const centerX = obs.x + obs.width / 2;
+          const centerY = obs.y + obs.height / 2;
+          
+          ctx.save();
+          ctx.translate(centerX, centerY);
           const color = `hsl(${obs.hue}, 100%, 50%)`;
           ctx.shadowBlur = 15;
           ctx.shadowColor = color;
           ctx.rotate(time * 0.002);
           
+          // Draw Polygon Shape
           ctx.fillStyle = '#0a0a0a';
           ctx.strokeStyle = color;
           ctx.lineWidth = 2;
@@ -1010,7 +1010,7 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 w-full h-full touch-none"
+      className="w-full h-full touch-none pointer-events-auto"
       id="game-canvas"
     />
   );
