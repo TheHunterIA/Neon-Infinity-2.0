@@ -7,6 +7,7 @@ import { Play, RotateCcw, Trophy, Share2, Github, Zap, Pause, Loader2 } from 'lu
 import { getSupabase } from './lib/supabase';
 import { initializeAdMob, showRewardedAd, isNative } from './services/adService';
 import { syncPendingScores, saveScoreLocally } from './services/scoreService';
+import { InstallBanner } from './components/InstallBanner';
 import { WifiOff } from 'lucide-react';
 
 export default function App() {
@@ -756,6 +757,8 @@ export default function App() {
           Deslize para mover • WASD/Setas para Teclado
         </div>
       )}
+
+      <InstallBanner />
     </div>
   );
 }
