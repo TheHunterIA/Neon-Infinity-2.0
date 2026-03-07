@@ -1,7 +1,7 @@
 {
-  "name": "Neon Dash: Space Runner",
+  "name": "Neon Dash: Infinity",
   "short_name": "NeonDash",
-  "description": "A high-speed neon-themed endless runner in deep space. Evolve your ship and survive the asteroid field!",
+  "description": "A high-speed, neon-soaked arcade game where you dodge obstacles and climb the global leaderboard.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",

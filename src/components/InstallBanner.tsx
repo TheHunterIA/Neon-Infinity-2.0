@@ -82,7 +82,7 @@ export const InstallBanner = () => {
               </div>
               
               <div className="flex-1">
-                <h3 className="font-bold text-white uppercase tracking-tighter">Instalar Neon Dash</h3>
+                <h3 className="font-bold text-white uppercase tracking-tighter">Instalar Neon Dash: Infinity</h3>
                 <p className="text-xs text-gray-400">
                   Adicione à tela inicial para jogar em tela cheia e offline!
                 </p>
