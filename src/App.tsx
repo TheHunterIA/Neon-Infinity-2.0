@@ -40,6 +40,7 @@ export default function App() {
   });
   const [tempUsername, setTempUsername] = useState(username);
   const [isCheckingName, setIsCheckingName] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [importId, setImportId] = useState('');
   const [isImporting, setIsImporting] = useState(false);
@@ -334,8 +335,9 @@ export default function App() {
   };
 
   const startGame = async () => {
+    setNameError(null);
     if (!tempUsername.trim()) {
-      alert('Please enter a pilot name');
+      setNameError('Please enter a pilot name');
       return;
     }
     
@@ -355,12 +357,11 @@ export default function App() {
         if (error) {
           console.error('Error checking name availability:', error);
         } else if (data && data.player_id && data.player_id !== playerId) {
-          alert('Este nome já está sendo usado por outro piloto. Por favor, escolha outro.');
+          setNameError('Este nome já está sendo usado por outro piloto.');
           setIsCheckingName(false);
           return;
         } else {
           // Claim the name immediately if it's new or belongs to us
-          // This ensures the player_id is linked even before the first game ends
           const { error: claimError } = await supabase
             .from('leaderboard')
             .upsert(
@@ -687,15 +688,39 @@ export default function App() {
                   </button>
                 </div>
               ) : (
-                <input
-                  type="text"
-                  placeholder="PILOT NAME"
-                  value={tempUsername}
-                  onChange={(e) => setTempUsername(e.target.value)}
-                  className="bg-white/5 border border-white/20 rounded-full py-3 px-6 text-center focus:outline-none focus:border-neon-cyan transition-colors uppercase tracking-widest font-mono text-sm"
-                  maxLength={15}
-                  autoFocus
-                />
+                <div className="flex flex-col gap-2">
+                  <input
+                    type="text"
+                    placeholder="PILOT NAME"
+                    value={tempUsername}
+                    onChange={(e) => {
+                      setTempUsername(e.target.value);
+                      setNameError(null);
+                    }}
+                    className={`bg-white/5 border ${nameError ? 'border-neon-magenta' : 'border-white/20'} rounded-full py-3 px-6 text-center focus:outline-none focus:border-neon-cyan transition-colors uppercase tracking-widest font-mono text-sm`}
+                    maxLength={15}
+                    autoFocus
+                  />
+                  {nameError && (
+                    <div className="flex flex-col items-center gap-1">
+                      <motion.p 
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-[10px] text-neon-magenta uppercase tracking-widest text-center font-bold"
+                      >
+                        {nameError}
+                      </motion.p>
+                      {nameError.includes('em uso') && (
+                        <button 
+                          onClick={() => setShowSettings(true)}
+                          className="text-[9px] text-white/40 hover:text-neon-cyan transition-colors uppercase tracking-widest border-b border-white/10"
+                        >
+                          Já é você? Use sua Chave de Acesso
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
               
               <button 
