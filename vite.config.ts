@@ -12,22 +12,33 @@ export default defineConfig(({mode}) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+        includeAssets: ['favicon.svg', 'icons/*.svg'],
         manifest: {
-          name: 'Neon Dash',
+          name: 'Neon Dash: Space Runner',
           short_name: 'NeonDash',
-          description: 'A high-speed neon-themed endless runner',
-          theme_color: '#000000',
+          description: 'A high-speed neon-themed endless runner in deep space. Evolve your ship and survive the asteroid field!',
+          theme_color: '#00f3ff',
+          background_color: '#000000',
+          display: 'standalone',
+          orientation: 'portrait',
           icons: [
             {
-              src: 'pwa-192x192.png',
+              src: 'icons/icon-192.svg',
               sizes: '192x192',
-              type: 'image/png'
+              type: 'image/svg+xml',
+              purpose: 'any'
             },
             {
-              src: 'pwa-512x512.png',
+              src: 'icons/icon-192.svg',
+              sizes: '192x192',
+              type: 'image/svg+xml',
+              purpose: 'maskable'
+            },
+            {
+              src: 'icons/icon-512.svg',
               sizes: '512x512',
-              type: 'image/png'
+              type: 'image/svg+xml',
+              purpose: 'any'
             }
           ]
         }

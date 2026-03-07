@@ -1,0 +1,47 @@
+{
+  "name": "Neon Dash: Space Runner",
+  "short_name": "NeonDash",
+  "description": "A high-speed neon-themed endless runner in deep space. Evolve your ship and survive the asteroid field!",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#00f3ff",
+  "icons": [
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["games", "action"],
+  "screenshots": [
+    {
+      "src": "https://picsum.photos/seed/neondash1/1080/1920",
+      "sizes": "1080x1920",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "High-speed space action"
+    },
+    {
+      "src": "https://picsum.photos/seed/neondash2/1920/1080",
+      "sizes": "1920x1080",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "Evolve your ship"
+    }
+  ]
+}

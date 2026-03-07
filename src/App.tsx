@@ -320,30 +320,13 @@ export default function App() {
       }, 3000);
     };
 
-    // Check for native environment via window.Capacitor or isNative()
-    if ((window as any).Capacitor) {
-      try {
-        await AdMob.prepareRewardVideoAd({
-          adId: 'ca-app-pub-3940256099942544/5224354917',
-        });
-        const reward = await AdMob.showRewardVideoAd();
-        if (reward) {
-          performRevive();
-        } else {
-          setIsAdLoading(false);
-          alert('Falha ao carregar vídeo. Tente novamente.');
-        }
-      } catch (e) {
-        console.error('AdMob Error:', e);
-        setIsAdLoading(false);
-        alert('Falha ao carregar vídeo. Tente novamente.');
-      }
-    } else {
-      // Web Simulation: 3s delay
-      setTimeout(() => {
-        performRevive();
-      }, 3000);
-    }
+    const handleFail = () => {
+      setIsAdLoading(false);
+      alert('Falha ao carregar vídeo. Tente novamente.');
+    };
+
+    // Use centralized ad service
+    await showRewardedAd(performRevive, handleFail);
   };
 
   const togglePause = React.useCallback(() => {

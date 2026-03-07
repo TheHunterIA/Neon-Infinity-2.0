@@ -149,7 +149,7 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
       
       // Level every 2000 points up to 20000 (Level 0 to 10)
       const level = Math.min(10, Math.floor(score / 2000));
-      let shipScale = (laneWidth / 100) * (1 + level * 0.04);
+      let shipScale = (laneWidth / 100);
       if (powerUpActiveRef.current?.type === 'shrink') shipScale *= 0.5;
       
       const shipWidth = 25 * shipScale;
@@ -540,9 +540,6 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
       const currentLevel = Math.min(10, Math.floor(scoreRef.current / 2000));
       if (currentLevel > lastLevelRef.current) {
         lastLevelRef.current = currentLevel;
-        const levelBonus = currentLevel * 1000;
-        scoreRef.current += levelBonus;
-        onScoreUpdate(scoreRef.current);
         
         floatingTextsRef.current.push({
           x: playerX, y: playerY - 80,
@@ -711,17 +708,16 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
           ctx.fill();
           ctx.globalAlpha = 1;
         } else {
-          // Asteroid Obstacle: Enhanced Crystalline Design
+          // Asteroid Obstacle: Simple Neon Design
           ctx.translate(obs.x + obs.width / 2, obs.y + obs.height / 2);
           const color = `hsl(${obs.hue}, 100%, 50%)`;
-          ctx.shadowBlur = 25;
+          ctx.shadowBlur = 15;
           ctx.shadowColor = color;
           ctx.rotate(time * 0.002);
           
-          // Draw irregular body with crystalline facets
           ctx.fillStyle = '#0a0a0a';
           ctx.strokeStyle = color;
-          ctx.lineWidth = 2.5;
+          ctx.lineWidth = 2;
           ctx.beginPath();
           if (obs.points && obs.points.length > 0) {
             ctx.moveTo(obs.points[0].x, obs.points[0].y);
@@ -734,42 +730,6 @@ export const Game: React.FC<GameProps> = ({ isStarted, isGameOver, isPaused, isI
           ctx.closePath();
           ctx.fill();
           ctx.stroke();
-
-          // Crystalline Facets
-          if (obs.points && obs.points.length > 0) {
-            ctx.beginPath();
-            ctx.strokeStyle = color;
-            ctx.globalAlpha = 0.3;
-            ctx.lineWidth = 1;
-            for (let i = 0; i < obs.points.length; i++) {
-              ctx.moveTo(0, 0);
-              ctx.lineTo(obs.points[i].x, obs.points[i].y);
-            }
-            ctx.stroke();
-            ctx.globalAlpha = 1;
-          }
-
-          // Glowing Core
-          const corePulse = Math.sin(time * 0.01) * 2;
-          ctx.beginPath();
-          ctx.arc(0, 0, obs.width * 0.15 + corePulse, 0, Math.PI * 2);
-          ctx.fillStyle = color;
-          ctx.shadowBlur = 15;
-          ctx.fill();
-
-          // Add Craters/Details
-          ctx.globalAlpha = 0.4;
-          ctx.strokeStyle = '#fff';
-          ctx.lineWidth = 1;
-          if (obs.points && obs.points.length > 0) {
-            for (let i = 0; i < 2; i++) {
-              const p = obs.points[i * 3 % obs.points.length];
-              ctx.beginPath();
-              ctx.arc(p.x * 0.4, p.y * 0.4, obs.width * 0.08, 0, Math.PI * 2);
-              ctx.stroke();
-            }
-          }
-          ctx.globalAlpha = 1;
         }
         ctx.restore();
 

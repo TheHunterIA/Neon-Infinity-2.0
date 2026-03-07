@@ -1,0 +1,7 @@
+<svg width="192" height="192" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg">
+  <rect width="192" height="192" fill="#000000"/>
+  <path d="M40 150 L96 40 L152 150 Z" fill="none" stroke="#00f3ff" stroke-width="8" stroke-linejoin="round"/>
+  <circle cx="96" cy="96" r="20" fill="#ff00ff" opacity="0.8">
+    <animate attributeName="r" values="18;22;18" dur="2s" repeatCount="indefinite" />
+  </circle>
+</svg>
