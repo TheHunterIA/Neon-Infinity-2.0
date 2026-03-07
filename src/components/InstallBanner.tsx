@@ -1,38 +1,67 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Download, X, Smartphone } from 'lucide-react';
-
-const APK_URL = import.meta.env.VITE_APK_DOWNLOAD_URL || '#';
+import { Download, X, Smartphone, Plus } from 'lucide-react';
 
 export const InstallBanner = () => {
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    // Check if on Android
-    const isAndroid = /Android/i.test(navigator.userAgent);
-    
-    // Check if already in standalone mode (installed PWA)
+    const handleBeforeInstallPrompt = (e: Event) => {
+      // Prevent Chrome 67 and earlier from automatically showing the prompt
+      e.preventDefault();
+      // Stash the event so it can be triggered later.
+      setDeferredPrompt(e);
+      
+      // Check if user has dismissed it before in this session
+      const isDismissed = sessionStorage.getItem('pwa-banner-dismissed');
+      
+      if (!isDismissed) {
+        // Show after a short delay
+        const timer = setTimeout(() => setIsVisible(true), 3000);
+        return () => clearTimeout(timer);
+      }
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // Check if already in standalone mode
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
-
-    // Check if user has dismissed it before in this session
-    const isDismissed = sessionStorage.getItem('apk-banner-dismissed');
-
-    if (isAndroid && !isStandalone && !isDismissed && APK_URL !== '#') {
-      // Show after a short delay to not be too intrusive
-      const timer = setTimeout(() => setIsVisible(true), 2000);
-      return () => clearTimeout(timer);
+    if (isStandalone) {
+      setIsVisible(false);
     }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
   }, []);
 
   const handleDismiss = () => {
     setIsVisible(false);
-    sessionStorage.setItem('apk-banner-dismissed', 'true');
+    sessionStorage.setItem('pwa-banner-dismissed', 'true');
   };
 
-  const handleDownload = () => {
-    window.location.href = APK_URL;
-    handleDismiss();
+  const handleInstall = async () => {
+    if (!deferredPrompt) return;
+
+    // Show the prompt
+    deferredPrompt.prompt();
+
+    // Wait for the user to respond to the prompt
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    if (outcome === 'accepted') {
+      console.log('User accepted the install prompt');
+      setIsVisible(false);
+    } else {
+      console.log('User dismissed the install prompt');
+    }
+
+    // We've used the prompt, and can't use it again, throw it away
+    setDeferredPrompt(null);
   };
+
+  if (!deferredPrompt && !isVisible) return null;
 
   return (
     <AnimatePresence>
@@ -45,17 +74,17 @@ export const InstallBanner = () => {
         >
           <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/80 p-4 backdrop-blur-xl shadow-2xl">
             {/* Background Glow */}
-            <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-cyan-500/20 blur-2xl" />
+            <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-neon-cyan/20 blur-2xl" />
             
             <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-cyan-500/20 text-cyan-400">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-neon-cyan/20 text-neon-cyan">
                 <Smartphone size={24} />
               </div>
               
               <div className="flex-1">
-                <h3 className="font-bold text-white">Experiência Nativa</h3>
+                <h3 className="font-bold text-white uppercase tracking-tighter">Instalar Neon Dash</h3>
                 <p className="text-xs text-gray-400">
-                  Baixe o APK para melhor performance e suporte a controles!
+                  Adicione à tela inicial para jogar em tela cheia e offline!
                 </p>
               </div>
 
@@ -69,11 +98,11 @@ export const InstallBanner = () => {
 
             <div className="mt-4 flex gap-2">
               <button
-                onClick={handleDownload}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-cyan-500 py-2.5 text-sm font-bold text-black transition-all hover:bg-cyan-400 active:scale-95"
+                onClick={handleInstall}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-neon-cyan py-2.5 text-sm font-bold text-black transition-all hover:bg-white active:scale-95 uppercase tracking-widest"
               >
-                <Download size={16} />
-                Baixar APK
+                <Plus size={16} />
+                Instalar App
               </button>
             </div>
           </div>

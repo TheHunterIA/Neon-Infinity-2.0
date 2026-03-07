@@ -5,7 +5,6 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL: string
   readonly VITE_SUPABASE_ANON_KEY: string
   readonly VITE_ADMOB_REWARDED_ID: string
-  readonly VITE_APK_DOWNLOAD_URL: string
 }
 
 interface ImportMeta {
