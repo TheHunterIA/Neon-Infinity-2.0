@@ -505,7 +505,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 pointer-events-none z-10 p-8 flex flex-col justify-between"
+            className="fixed inset-0 pointer-events-none z-10 p-8 flex flex-col justify-start"
           >
             <div className="flex justify-between items-start">
               <div className="flex flex-col opacity-40 hover:opacity-100 transition-opacity">
@@ -513,18 +513,25 @@ export default function App() {
                 <span className="text-lg sm:text-2xl font-black font-mono text-white tracking-tighter">DASH_INF</span>
               </div>
 
-              {activePowerUp && (
-                <motion.div 
-                  initial={{ y: -20, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  className="flex flex-col items-center bg-white/5 border border-white/10 px-4 py-2 rounded-2xl backdrop-blur-md"
-                >
-                  <span className="text-[8px] uppercase tracking-widest text-neon-cyan font-bold">Active Protocol</span>
-                  <span className="text-sm font-black font-mono text-white uppercase tracking-tighter">
-                    {activePowerUp.type} ({Math.max(0, Math.ceil((activePowerUp.end - performance.now()) / 1000))}s)
-                  </span>
-                </motion.div>
-              )}
+              <div className="flex flex-col items-center">
+                <div className="flex flex-col items-center mb-4">
+                  <span className="text-[8px] sm:text-[10px] uppercase tracking-[0.8em] text-neon-cyan/30 font-mono mb-1 sm:mb-2">Current Yield</span>
+                  <span className="text-2xl sm:text-4xl font-black font-mono text-white/40 tracking-tighter">{score}</span>
+                </div>
+
+                {activePowerUp && (
+                  <motion.div 
+                    initial={{ y: -20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    className="flex flex-col items-center bg-white/5 border border-white/10 px-4 py-2 rounded-2xl backdrop-blur-md"
+                  >
+                    <span className="text-[8px] uppercase tracking-widest text-neon-cyan font-bold">Active Protocol</span>
+                    <span className="text-sm font-black font-mono text-white uppercase tracking-tighter">
+                      {activePowerUp.type} ({Math.max(0, Math.ceil((activePowerUp.end - performance.now()) / 1000))}s)
+                    </span>
+                  </motion.div>
+                )}
+              </div>
               
               <div className="flex flex-col items-end gap-4 pointer-events-auto">
                 <button 
@@ -534,11 +541,6 @@ export default function App() {
                   <Pause size={18} className="text-white/40 group-hover:text-neon-cyan" />
                 </button>
               </div>
-            </div>
-
-            <div className="flex flex-col items-center mb-8 sm:mb-12">
-              <span className="text-[8px] sm:text-[10px] uppercase tracking-[0.8em] text-neon-cyan/30 font-mono mb-1 sm:mb-2">Current Yield</span>
-              <span className="text-4xl sm:text-6xl font-black font-mono text-white/20 tracking-tighter">{score}</span>
             </div>
           </motion.div>
         )}
@@ -566,7 +568,23 @@ export default function App() {
             </motion.div>
 
             <div className="flex flex-col gap-3 sm:gap-4 w-full max-w-[280px] sm:max-w-xs px-4">
-              {!username && (
+              {username ? (
+                <div className="flex flex-col items-center gap-2 mb-2">
+                  <div className="flex flex-col items-center">
+                    <span className="text-[8px] uppercase tracking-widest text-white/40 font-mono">Active Pilot</span>
+                    <span className="text-lg font-black font-mono text-neon-cyan tracking-tighter uppercase">{username}</span>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setUsername('');
+                      setTempUsername(username);
+                    }}
+                    className="text-[10px] text-white/40 hover:text-neon-magenta transition-colors uppercase tracking-widest border-b border-transparent hover:border-neon-magenta/30 pb-0.5"
+                  >
+                    Change Pilot
+                  </button>
+                </div>
+              ) : (
                 <input
                   type="text"
                   placeholder="PILOT NAME"
@@ -574,6 +592,7 @@ export default function App() {
                   onChange={(e) => setTempUsername(e.target.value)}
                   className="bg-white/5 border border-white/20 rounded-full py-3 px-6 text-center focus:outline-none focus:border-neon-cyan transition-colors uppercase tracking-widest font-mono text-sm"
                   maxLength={15}
+                  autoFocus
                 />
               )}
               
